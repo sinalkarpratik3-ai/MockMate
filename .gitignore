@@ -25,10 +25,8 @@ dist/
 
 # Environment files and credentials (NEVER commit secrets!)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # IDE and OS
 .DS_Store

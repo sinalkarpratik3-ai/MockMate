@@ -1,0 +1,37 @@
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & caches
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+verify_gemini_integration.py
+
+# Local SQLite databases & backups
+*.db
+*.sqlite3
+mockmate.db
+
+# Secrets & local environment files
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

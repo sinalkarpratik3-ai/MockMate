@@ -1,23 +1,27 @@
 import os
-from typing import List, Union
+from pathlib import Path
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
+ROOT_DIR = BASE_DIR.parent  # MockMate/
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MockMate - Interview Preparation Platform"
     API_V1_STR: str = "/api"
     
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-jwt-key-for-mockmate-dev-2026-secure")
+    SECRET_KEY: str = "super-secret-jwt-key-for-mockmate-dev-2026-secure"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./mockmate.db")
+    DATABASE_URL: str = "sqlite:///./mockmate.db"
     
-    # Gemini AI
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    # Gemini Integration
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -34,6 +38,10 @@ class Settings(BaseSettings):
             return v.replace("postgres://", "postgresql://", 1)
         return v
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", extra="allow")
+    model_config = SettingsConfigDict(
+        case_sensitive=True, 
+        env_file=[str(BASE_DIR / ".env"), str(ROOT_DIR / ".env"), ".env"], 
+        extra="allow"
+    )
 
 settings = Settings()

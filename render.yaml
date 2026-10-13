@@ -1,13 +1,12 @@
 services:
-  # Backend FastAPI Web Service
+  # Backend FastAPI Web Service (Docker)
   - type: web
     name: mockmate-backend
-    env: python
+    env: docker
     region: oregon
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
@@ -19,26 +18,22 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+        value: gemini-3.5-flash-lite
 
-  # Frontend Next.js Web Service
+  # Frontend Next.js Web Service (Docker)
   - type: web
     name: mockmate-frontend
-    env: node
+    env: docker
     region: oregon
     plan: free
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web
           name: mockmate-backend
           envVarKey: RENDER_EXTERNAL_URL
-          # Appends /api route to the deployed backend url
-      - key: NODE_VERSION
-        value: 20.18.0
 
 databases:
   # Managed PostgreSQL Database

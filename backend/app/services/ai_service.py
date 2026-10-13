@@ -238,10 +238,17 @@ FALLBACK_TEXT_BANK = {
 }
 
 class AIService:
-    def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY
-        self.model = settings.GEMINI_MODEL
-        self.base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+    @property
+    def api_key(self) -> str:
+        return settings.GEMINI_API_KEY or ""
+
+    @property
+    def model(self) -> str:
+        return settings.GEMINI_MODEL or "gemini-3.5-flash-lite"
+
+    @property
+    def base_url(self) -> str:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
 
     async def _call_gemini(self, prompt: str) -> Optional[str]:
         """Calls Gemini API with structured JSON request and error resilience."""

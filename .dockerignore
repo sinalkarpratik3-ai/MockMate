@@ -1,0 +1,34 @@
+# Environment files and credentials (CRITICAL: Never bake secrets into Docker images)
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases
+*.db
+*.sqlite3
+mockmate.db
+backend/mockmate.db
+
+# Python bytecode and caches
+**/__pycache__/
+**/*.py[cod]
+backend/.venv/
+**/.venv/
+**/.pytest_cache/
+backend/tests/
+
+# Node dependencies and build artifacts
+frontend/node_modules/
+**/node_modules/
+frontend/.next/
+**/.next/
+frontend/out/
+
+# Git and OS metadata
+.git/
+.gitignore
+.gitattributes
+.DS_Store
+Thumbs.db
+*.bat
+README.md

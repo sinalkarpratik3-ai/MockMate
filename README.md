@@ -321,7 +321,25 @@ GEMINI_MODEL=gemini-1.5-flash
 
 ## 17. Running the Application Locally
 
-### Start Backend
+### Quick Launch on Windows (1-Click)
+Simply double-click:
+```text
+start_mockmate.bat
+```
+This batch script automatically:
+1. Detects local Node.js and Python virtual environment installations.
+2. Starts the FastAPI backend service (`http://localhost:8000`).
+3. Starts the Next.js frontend web server (`http://localhost:3000`).
+4. Automatically opens `http://localhost:3000` in your default browser.
+
+To stop all local services in one click, double-click:
+```text
+stop_mockmate.bat
+```
+
+### Manual Command-Line Startup
+
+#### Start Backend
 ```bash
 cd backend
 .venv\Scripts\Activate.ps1
@@ -329,7 +347,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 API runs at `http://127.0.0.1:8000` (Interactive API docs at `http://127.0.0.1:8000/api/docs`).
 
-### Start Frontend
+#### Start Frontend
 ```bash
 cd frontend
 npm run dev
@@ -354,18 +372,25 @@ Expected output:
 
 ---
 
-## 19. Render Deployment Guide
-The project includes a complete Render Blueprint (`render.yaml`):
+## 19. Docker & Render Deployment Guide
 
+The repository includes production Dockerfiles and a verified Render Blueprint (`render.yaml`) with **auto-deploy on commit**:
+
+### Docker Architecture
+- **Backend Dockerfile** (`backend/Dockerfile` & root `Dockerfile`): Minimal `python:3.11-slim` image with Uvicorn, dependency caching, dynamic `$PORT` binding for Render, and `/api/health` container health checks.
+- **Frontend Dockerfile** (`frontend/Dockerfile`): Multi-stage `node:20-alpine` build compiling Next.js with optimized production bundles and dynamic `$PORT` binding.
+- **Docker Ignore Files** (`.dockerignore`, `backend/.dockerignore`, `frontend/.dockerignore`): Exclude node_modules, virtualenvs, local `.env` files, databases, and build caches.
+
+### Deploying via Render Blueprint
 1. Push your repository to GitHub: `https://github.com/sinalkarpratik3-ai/MockMate`.
 2. In the [Render Dashboard](https://dashboard.render.com/), click **New +** &rarr; **Blueprint**.
 3. Select your `MockMate` repository.
 4. Render automatically configures:
    - **PostgreSQL Database**: `mockmate-db`
-   - **FastAPI Web Service**: `mockmate-backend`
-   - **Next.js Web Service**: `mockmate-frontend`
-5. Set `GEMINI_API_KEY` in the backend service environment settings if using an external generation service.
-6. Click **Apply** to deploy the database and web services.
+   - **FastAPI Docker Web Service**: `mockmate-backend` (using `backend/Dockerfile`)
+   - **Next.js Docker Web Service**: `mockmate-frontend` (using `frontend/Dockerfile`)
+5. In the Render Dashboard, add your `GEMINI_API_KEY` to the `mockmate-backend` environment variables.
+6. Click **Apply**. Any subsequent commit pushed to `main` will automatically trigger a new Docker build and rolling deployment on Render.
 
 ---
 
