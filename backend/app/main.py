@@ -34,7 +34,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/")
 def root():
     return {
-        "message": "Welcome to MockMate - AI-Based Interview Preparation Simulator API",
+        "message": "Welcome to MockMate - Interview Preparation Platform API",
         "docs": f"{settings.API_V1_STR}/docs",
         "health": f"{settings.API_V1_STR}/health"
     }

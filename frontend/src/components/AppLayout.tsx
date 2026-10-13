@@ -24,9 +24,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-600">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
-        <p className="text-sm font-medium">Loading MockMate...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F3EA] text-[#252923]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#24483F] mb-3" />
+        <p className="text-sm font-medium text-[#777B74]">Loading your practice workspace...</p>
       </div>
     );
   }
@@ -36,7 +36,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-[#F7F3EA] text-[#252923] flex flex-col">
       <Navbar onMobileMenuToggle={() => setMobileMenuOpen(true)} />
       
       <div className="flex-1 flex max-w-7xl w-full mx-auto">

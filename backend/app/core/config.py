@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AnyHttpUrl, field_validator
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "MockMate - AI Interview Preparation Simulator"
+    PROJECT_NAME: str = "MockMate - Interview Preparation Platform"
     API_V1_STR: str = "/api"
     
     # Security

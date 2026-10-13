@@ -6,9 +6,8 @@ import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
 import { Interview } from "@/types";
 import { 
-  Sparkles, 
   Target, 
-  FileText, 
+  BookOpen, 
   ArrowRight, 
   Loader2, 
   CheckCircle2, 
@@ -18,12 +17,11 @@ import {
   Cpu, 
   Layers, 
   Database,
-  Sliders,
   AlertCircle
 } from "lucide-react";
 
 const ROLES = [
-  { id: "Frontend Developer", name: "Frontend Developer", icon: Code2, desc: "React, Next.js, DOM, CSS Grid/Flexbox, Core Web Vitals" },
+  { id: "Frontend Developer", name: "Frontend Developer", icon: Code2, desc: "React, Next.js, DOM, CSS architecture, Core Web Vitals" },
   { id: "Backend Developer", name: "Backend Developer", icon: Server, desc: "REST APIs, database indexing, caching, microservices, auth" },
   { id: "Python Developer", name: "Python Developer", icon: Terminal, desc: "GIL, asyncio, decorators, memory management, generators" },
   { id: "Java Developer", name: "Java Developer", icon: Cpu, desc: "JVM memory, Spring Boot, GC, thread pools, Hibernate" },
@@ -64,7 +62,7 @@ export default function NewInterviewPage() {
 
       router.push(`/interviews/${interview.id}`);
     } catch (err: any) {
-      setError(err.message || "Failed to generate interview. Please try again.");
+      setError(err.message || "Failed to prepare your practice session. Please try again.");
       setLoading(false);
     }
   };
@@ -73,20 +71,20 @@ export default function NewInterviewPage() {
     <AppLayout>
       <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-12">
         {/* Header */}
-        <div className="border-b border-slate-200 pb-4">
+        <div className="border-b border-[#E8DDCA] pb-4">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Configuration</span>
+            <span className="text-xs font-bold text-[#879477] uppercase tracking-widest">Configuration</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Configure Interview Simulation
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#252923] tracking-tight">
+            Set Up Your Practice Session
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Select your target domain, difficulty, and preferred answer mode to generate AI-curated questions.
+          <p className="text-xs sm:text-sm text-[#777B74] mt-1">
+            Choose what you want to practise and create a session that matches your goals.
           </p>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
+          <div className="p-4 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-[#B8473F] text-xs flex items-start gap-2.5">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -94,8 +92,8 @@ export default function NewInterviewPage() {
 
         {/* Step 1: Select Role */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-            Step 1: Select Job Role
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#879477]">
+            Step 1: Target Role
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {ROLES.map((role) => {
@@ -108,21 +106,21 @@ export default function NewInterviewPage() {
                   onClick={() => setSelectedRole(role.id)}
                   className={`p-4 rounded-xl text-left border transition-all flex flex-col justify-between ${
                     isSelected
-                      ? "border-indigo-600 bg-indigo-50/60 shadow-xs ring-1 ring-indigo-600"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                      ? "border-[#24483F] bg-[#EDF3EB] shadow-xs ring-1 ring-[#24483F]"
+                      : "border-[#E8DDCA] bg-white hover:border-[#DCE6D8] hover:bg-[#FAF8F4]"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                      isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                      isSelected ? "bg-[#24483F] text-[#F7F3EA]" : "bg-[#FAF8F4] text-[#252923] border border-[#E8DDCA]"
                     }`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    {isSelected && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}
+                    {isSelected && <CheckCircle2 className="h-4 w-4 text-[#24483F]" />}
                   </div>
                   <div>
-                    <h3 className="font-bold text-xs text-slate-900">{role.name}</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{role.desc}</p>
+                    <h3 className="font-bold text-xs text-[#252923]">{role.name}</h3>
+                    <p className="text-[11px] text-[#777B74] mt-0.5 line-clamp-2">{role.desc}</p>
                   </div>
                 </button>
               );
@@ -132,8 +130,8 @@ export default function NewInterviewPage() {
 
         {/* Step 2: Select Difficulty */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-            Step 2: Select Experience Difficulty
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#879477]">
+            Step 2: Experience Level
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {DIFFICULTIES.map((diff) => {
@@ -145,94 +143,94 @@ export default function NewInterviewPage() {
                   onClick={() => setSelectedDifficulty(diff.id)}
                   className={`p-4 rounded-xl text-left border transition-all ${
                     isSelected
-                      ? "border-indigo-600 bg-indigo-50/60 shadow-xs ring-1 ring-indigo-600"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                      ? "border-[#24483F] bg-[#EDF3EB] shadow-xs ring-1 ring-[#24483F]"
+                      : "border-[#E8DDCA] bg-white hover:border-[#DCE6D8] hover:bg-[#FAF8F4]"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <h3 className="font-bold text-xs text-slate-900">{diff.name}</h3>
-                    {isSelected && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}
+                    <h3 className="font-bold text-xs text-[#252923]">{diff.name}</h3>
+                    {isSelected && <CheckCircle2 className="h-4 w-4 text-[#24483F]" />}
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">{diff.desc}</p>
+                  <p className="text-[11px] text-[#777B74] leading-relaxed">{diff.desc}</p>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Step 3: Select Mode (Prominently highlighted cards) */}
+        {/* Step 3: Select Mode */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-            Step 3: Select Answer Mode
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#879477]">
+            Step 3: Practice Format
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Mode A: MCQ */}
+            {/* Multiple Choice */}
             <button
               type="button"
               onClick={() => setSelectedMode("mcq")}
               className={`p-5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
                 selectedMode === "mcq"
-                  ? "border-blue-600 bg-blue-50/60 shadow-md ring-2 ring-blue-500"
-                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                  ? "border-[#24483F] bg-[#EDF3EB] shadow-sm ring-2 ring-[#24483F]"
+                  : "border-[#E8DDCA] bg-white hover:border-[#DCE6D8] hover:bg-[#FAF8F4]"
               }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    selectedMode === "mcq" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                    selectedMode === "mcq" ? "bg-[#24483F] text-[#F7F3EA]" : "bg-[#FAF8F4] text-[#24483F] border border-[#E8DDCA]"
                   }`}>
                     <Target className="h-5 w-5" />
                   </div>
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                    selectedMode === "mcq" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                    selectedMode === "mcq" ? "bg-[#24483F] text-[#F7F3EA]" : "bg-[#FAF8F4] text-[#777B74] border border-[#E8DDCA]"
                   }`}>
-                    Mode A
+                    Multiple Choice
                   </span>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-1">MCQ-Based Interview</h3>
-                <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                  Select the correct option from 4 possibilities. Practice fast-paced technical concepts and receive instant deterministic marks and explanations upon submission.
+                <h3 className="text-base font-bold text-[#252923] mb-1">Multiple Choice</h3>
+                <p className="text-xs text-[#777B74] leading-relaxed mb-4">
+                  Test your knowledge by choosing the correct answer. Instant scoring and detailed explanations upon completion.
                 </p>
               </div>
 
-              <div className="text-[11px] font-medium text-blue-700 flex items-center gap-1.5 pt-2 border-t border-blue-100/60">
+              <div className="text-[11px] font-medium text-[#24483F] flex items-center gap-1.5 pt-2 border-t border-[#DCE6D8]">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>Deterministic Scoring & Explanations</span>
               </div>
             </button>
 
-            {/* Mode B: Text */}
+            {/* Written Answers */}
             <button
               type="button"
               onClick={() => setSelectedMode("text")}
               className={`p-5 rounded-2xl text-left border transition-all flex flex-col justify-between ${
                 selectedMode === "text"
-                  ? "border-indigo-600 bg-indigo-50/60 shadow-md ring-2 ring-indigo-500"
-                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                  ? "border-[#24483F] bg-[#EDF3EB] shadow-sm ring-2 ring-[#24483F]"
+                  : "border-[#E8DDCA] bg-white hover:border-[#DCE6D8] hover:bg-[#FAF8F4]"
               }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                    selectedMode === "text" ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-700"
+                    selectedMode === "text" ? "bg-[#24483F] text-[#F7F3EA]" : "bg-[#FAF8F4] text-[#C66A4A] border border-[#E8DDCA]"
                   }`}>
-                    <Sparkles className="h-5 w-5" />
+                    <BookOpen className="h-5 w-5" />
                   </div>
                   <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                    selectedMode === "text" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                    selectedMode === "text" ? "bg-[#24483F] text-[#F7F3EA]" : "bg-[#FAF8F4] text-[#777B74] border border-[#E8DDCA]"
                   }`}>
-                    Mode B
+                    Written Answers
                   </span>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-1">Text-Based Technical Interview</h3>
-                <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                  Write your own answers in multiline response editor. Evaluated by Gemini AI on correctness, technical depth, clarity, missing keywords, and accompanied by full model answers.
+                <h3 className="text-base font-bold text-[#252923] mb-1">Written Answers</h3>
+                <p className="text-xs text-[#777B74] leading-relaxed mb-4">
+                  Explain your understanding in your own words and receive detailed feedback, missed concepts, and sample answers.
                 </p>
               </div>
 
-              <div className="text-[11px] font-medium text-indigo-700 flex items-center gap-1.5 pt-2 border-t border-indigo-100/60">
+              <div className="text-[11px] font-medium text-[#24483F] flex items-center gap-1.5 pt-2 border-t border-[#DCE6D8]">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>AI Rubric Evaluation & Model Answers</span>
+                <span>Personalised Feedback & Sample Answers</span>
               </div>
             </button>
           </div>
@@ -240,7 +238,7 @@ export default function NewInterviewPage() {
 
         {/* Step 4: Question Count */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#879477]">
             Step 4: Number of Questions
           </label>
           <div className="flex gap-3">
@@ -251,8 +249,8 @@ export default function NewInterviewPage() {
                 onClick={() => setQuestionCount(num)}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs border transition-all ${
                   questionCount === num
-                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    ? "bg-[#24483F] text-[#F7F3EA] border-[#24483F] shadow-xs"
+                    : "bg-white text-[#252923] border-[#E8DDCA] hover:bg-[#FAF8F4]"
                 }`}
               >
                 {num} Questions
@@ -262,11 +260,11 @@ export default function NewInterviewPage() {
         </div>
 
         {/* Configuration Summary & Action */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="p-5 rounded-2xl bg-white border border-[#E8DDCA] shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <span className="text-[11px] font-bold uppercase text-slate-400">Ready to begin</span>
-            <p className="text-sm font-bold text-slate-900 mt-0.5">
-              {selectedDifficulty} {selectedRole} • {selectedMode.toUpperCase()} Mode ({questionCount} Qs)
+            <span className="text-[11px] font-bold uppercase text-[#879477]">Session Summary</span>
+            <p className="text-sm font-bold text-[#252923] mt-0.5">
+              {selectedDifficulty} {selectedRole} • {selectedMode === "mcq" ? "Multiple Choice" : "Written"} ({questionCount} Questions)
             </p>
           </div>
 
@@ -274,16 +272,16 @@ export default function NewInterviewPage() {
             type="button"
             onClick={handleStart}
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-600/20 transition-all disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#24483F] hover:bg-[#1A342D] text-[#F7F3EA] font-semibold text-sm shadow-sm transition-all disabled:opacity-60"
           >
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating Questions via Gemini AI...</span>
+                <span>Preparing your questions...</span>
               </>
             ) : (
               <>
-                <span>Start Interview Simulation</span>
+                <span>Create Practice Test</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

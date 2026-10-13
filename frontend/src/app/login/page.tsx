@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Sparkles, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,26 +42,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F7F3EA] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-flex items-center gap-2 group mb-4">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-            <Sparkles className="h-5 w-5" />
+        <Link href="/" className="inline-flex items-center gap-2.5 group mb-4">
+          <div className="h-10 w-10 rounded-xl bg-[#24483F] flex items-center justify-center text-[#F7F3EA] shadow-sm">
+            <CheckCircle2 className="h-5 w-5" />
           </div>
-          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">
-            Mock<span className="text-indigo-600">Mate</span>
+          <span className="font-extrabold text-2xl text-[#252923] tracking-tight">
+            Mock<span className="text-[#24483F]">Mate</span>
           </span>
         </Link>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in to your account</h2>
-        <p className="mt-2 text-xs text-slate-600">
-          Prepare for technical interviews with simulated AI precision.
+        <h2 className="text-2xl font-bold text-[#252923] tracking-tight">Sign in to your account</h2>
+        <p className="mt-1 text-xs text-[#777B74]">
+          Continue your interview preparation and track your progress.
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl border border-[#E8DDCA] shadow-sm">
           {error && (
-            <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-start gap-2.5">
+            <div className="mb-6 p-3.5 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-[#B8473F] text-xs flex items-start gap-2.5">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -69,7 +69,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="email">
+              <label className="block text-xs font-semibold text-[#252923] mb-1.5" htmlFor="email">
                 Email Address
               </label>
               <input
@@ -79,13 +79,13 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="developer@example.com"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-slate-50/50 focus:bg-white"
+                placeholder="you@example.com"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DDCA] text-sm text-[#252923] placeholder:text-[#879477] focus:outline-none focus:ring-2 focus:ring-[#24483F] focus:border-[#24483F] transition-all bg-[#FAF8F4] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="password">
+              <label className="block text-xs font-semibold text-[#252923] mb-1.5" htmlFor="password">
                 Password
               </label>
               <input
@@ -96,14 +96,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-slate-50/50 focus:bg-white"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DDCA] text-sm text-[#252923] placeholder:text-[#879477] focus:outline-none focus:ring-2 focus:ring-[#24483F] focus:border-[#24483F] transition-all bg-[#FAF8F4] focus:bg-white"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 mt-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all shadow-md shadow-indigo-600/20 disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 mt-2 px-4 py-2.5 rounded-xl bg-[#24483F] text-[#F7F3EA] font-semibold text-sm hover:bg-[#1A342D] focus:outline-none focus:ring-2 focus:ring-[#24483F] focus:ring-offset-2 transition-all shadow-sm disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -119,10 +119,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-600">
+          <div className="mt-6 pt-6 border-t border-[#E8DDCA] text-center">
+            <p className="text-xs text-[#777B74]">
               Don&apos;t have an account?{" "}
-              <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+              <Link href="/register" className="font-semibold text-[#24483F] hover:underline transition-colors">
                 Create one now
               </Link>
             </p>

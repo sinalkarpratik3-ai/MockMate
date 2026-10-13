@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MockMate - AI-Based Interview Preparation Simulator",
-  description: "Master technical interviews with AI-generated questions, MCQ practice, deep text answer evaluations, weak topic detection, and real-time progress analytics.",
+  title: "MockMate — Interview Preparation Platform",
+  description: "Practice technical interviews, test your knowledge, review your answers, and build confidence one session at a time.",
 };
 
 export default function RootLayout({
@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900">
+      <body className="min-h-full flex flex-col font-sans bg-[#F7F3EA] text-[#252923]">
         <AuthProvider>
           {children}
         </AuthProvider>

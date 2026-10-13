@@ -1,225 +1,248 @@
-# MockMate: AI-Based Interview Preparation Simulator
+# MockMate: Interview Preparation Platform
 
-![MockMate Banner](https://img.shields.io/badge/MockMate-AI%20Interview%20Simulator-4F46E5?style=for-the-badge&logo=fastapi&logoColor=white)
-![Build Status](https://img.shields.io/badge/Tests-12%2F12%20Passing-emerald?style=for-the-badge)
-![Render Ready](https://img.shields.io/badge/Render-Deployment%20Ready-46E3B7?style=for-the-badge&logo=render)
+![MockMate Banner](https://img.shields.io/badge/MockMate-Interview%20Preparation%20Platform-24483F?style=for-the-badge&logoColor=white)
+![Build Status](https://img.shields.io/badge/Tests-12%2F12%20Passing-367451?style=for-the-badge)
+![Render Ready](https://img.shields.io/badge/Render-Deployment%20Ready-24483F?style=for-the-badge&logo=render)
 
 ---
 
 ## 1. Project Title
-**MockMate: AI-Based Interview Preparation Simulator**
+**MockMate — Interview Preparation Platform**
 
 ---
 
 ## 2. Project Overview
-MockMate is an enterprise-grade, end-to-end web application engineered to bridge the gap between technical interview anxiety and confident performance. By integrating the Google Gemini API with deterministic evaluation pipelines and persistent PostgreSQL telemetry, MockMate simulates real-world engineering interviews across multiple job roles, difficulties, and practice modes.
+MockMate is a professional, human-centred interview preparation platform designed to help software engineers prepare for technical interviews with clarity and confidence. The platform provides structured practice sessions across multiple software engineering roles and experience levels, pairing multiple-choice conceptual quizzes with written technical answer assessments, detailed constructive feedback, sample answers, and persistent progress tracking.
 
-Candidates can practice rapid-fire multiple-choice questions (MCQs), submit in-depth architectural written answers evaluated against a 6-point technical rubric, view ideal model answers, track their performance trajectory over time, practice a daily featured challenge, and systematically eliminate their weak topics.
+Rather than treating interview preparation as a technology demonstration, MockMate focuses on the candidate's learning experience: helping users identify knowledge gaps, practice structured explanations, review sample solutions, and build lasting interview confidence.
 
 ---
 
 ## 3. Problem Statement
-Technical interview preparation is traditionally fragmented and inefficient:
-- Static question banks quickly become repetitive, lack role-specific calibration, and do not test deep practical trade-offs.
-- Practicing coding problems alone does not prepare engineers for conceptual, architectural, or behavioral interview questions.
-- Peer mock interviews are difficult to schedule, inconsistent in feedback quality, and lack objective historical performance tracking.
-- Candidates lack clear diagnostic data identifying which exact technical concepts are consistently pulling down their scores.
+Technical interview preparation is frequently fragmented, stressful, and unstructured:
+- Static question banks quickly grow repetitive, lack difficulty calibration, and fail to test deep practical reasoning.
+- Practicing standalone algorithm puzzles does not prepare candidates for architectural discussions, system design trade-offs, or conceptual deep-dives.
+- Peer practice interviews are hard to schedule consistently, yield variable feedback quality, and lack objective historical performance records.
+- Candidates rarely have clear diagnostic insight into which exact technical concepts pull down their interview performance over time.
 
 ---
 
-## 4. Project Objectives
-1. Provide a reliable, AI-driven technical interview simulator that generates tailored questions dynamically.
-2. Deliver dual assessment modes: fast deterministic MCQ practice and in-depth written answer evaluations.
-3. Eliminate guesswork with instant scoring, feedback bullets, missing keyword detection, and authoritative model answers.
-4. Persist all user attempts, scores, and sessions in a production-ready database (PostgreSQL).
-5. Compute real-time analytics to highlight weak topics (&lt;60% accuracy) and offer 1-click targeted revision.
-6. Build a Question of the Day streak feature to foster daily preparation habits.
-7. Ensure 100% Render hosting compatibility and strict security with password hashing and JWT isolation.
+## 4. Primary Objectives
+1. Provide a focused, distraction-free technical interview practice platform with dynamic session creation.
+2. Deliver complementary assessment formats: rapid-fire multiple-choice quizzes and in-depth written answer evaluations.
+3. Offer constructive feedback highlighting strengths, key concepts to review, and clear engineering sample answers.
+4. Persist all practice attempts, answers, and scores in a production-ready database (PostgreSQL with SQLite fallback).
+5. Track progress over time to identify weak topics (<60% accuracy) and offer direct targeted practice.
+6. Provide a Daily Challenge to foster a consistent, daily practice habit.
+7. Maintain strict security, user data isolation, and 100% compatibility with standard GitHub and Render deployment workflows.
 
 ---
 
-## 5. Project Scope
-The approved project scope encompasses exactly 13 core functional modules:
-- **Module 1**: User Authentication & Session Security
-- **Module 2**: Personalized Interview Preparation
-- **Module 3**: Multiple Answer Modes (MCQ & Text)
-- **Module 4**: AI-Powered Question Generation (Google Gemini)
-- **Module 5**: Automated Answer Evaluation (Deterministic MCQ + AI Rubric)
-- **Module 6**: Instant Feedback & Scorecard Display
-- **Module 7**: Engineering Model Answers
-- **Module 8**: Progress Tracking & Aggregated Telemetry
-- **Module 9**: Weak Topic Identification & Recommendation Engine
-- **Module 10**: Interview History & Question Bookmarks
-- **Module 11**: Question of the Day
-- **Module 12**: Performance Analytics Dashboard
-- **Module 13**: Responsive SaaS UI/UX adhering to Shneiderman's 8 Golden Rules
+## 5. Visual Identity and Design System
+MockMate uses an earthy, grounded, and professional visual identity designed for readability, focus, and comfort during long study sessions. The interface deliberately avoids generic purple-to-blue SaaS gradients, glowing artificial elements, or distracting novelty graphics.
+
+### Palette Tokens
+- **Forest Green (`#24483F`)**: Primary actions, active navigation tabs, major headings, and confirmed selections.
+- **Deep Charcoal (`#252923`)**: Primary body text, labels, and high-contrast content.
+- **Warm Cream (`#F7F3EA`)**: Dominant application canvas background.
+- **Soft Sage (`#DCE6D8`)**: Secondary surfaces, subtle highlights, active badges, and focus rings.
+- **Terracotta (`#C66A4A`)**: Intentional secondary accent for daily challenge callouts and alert badges.
+- **Muted Olive (`#879477`)**: Metadata, subheadings, and chart visualisations.
+- **Warm Sand (`#E8DDCA`)**: Card borders, dividers, and neutral surface framing.
+- **Muted Grey (`#777B74`)**: Secondary descriptions and supporting copy.
+- **Success Green (`#367451`)**: Correct answers and completed session indicators.
+- **Error Red (`#B8473F`)**: Form validation errors and incorrect answer indicators.
+- **Pure White (`#FFFFFF`)**: Reserved selectively for high-readability card surfaces and form inputs.
 
 ---
 
-## 6. Key Features
-- **Dynamic Question Generation**: Context-aware prompts requesting structured JSON questions for the candidate's exact role and difficulty tier.
-- **Dual Assessment Engine**: Deterministic instant evaluation for MCQs; 6-criterion rubric evaluation (technical depth, correctness, clarity, completeness, missing keywords) for text answers.
-- **Weak Topic Auto-Detection**: Flags concepts where performance falls below 60% across attempted sessions.
-- **Question Bookmarks Notebook**: Save challenging questions with full model answers and explanations to revise later.
-- **Daily Practice Streak**: One daily technical challenge per calendar day with duplicate attempt prevention.
-- **Private Data Isolation**: JWT-secured endpoints ensure users can only ever view and edit their own private sessions.
-- **Offline / Quota Resilience Engine**: Integrated domain fallback generator ensures 100% uptime even if API quotas fluctuate.
+## 6. Shneiderman’s Eight Golden Rules Implementation
+The entire interface has been engineered adhering strictly to Ben Shneiderman’s Eight Golden Rules of Interface Design:
+
+1. **Consistency**: Unified color tokens, typography scales, card layouts, and interaction patterns across all 13 modules.
+2. **Universal Usability**: Fully responsive across mobile, tablet, and desktop viewports with accessible contrast ratios.
+3. **Informative Feedback**: Clear progress indicators during session creation, answer submission, and bookmarking.
+4. **Dialogues with Closure**: Well-defined sequence flows: Configure Session &rarr; Complete Questions &rarr; Submit &rarr; Review Scorecard.
+5. **Error Prevention**: Form validation prevents blank submissions; destructive actions require confirmation dialogs.
+6. **Easy Reversal**: Users can freely navigate between questions before submission and toggle saved question bookmarks.
+7. **User Control**: Explicit user actions trigger submissions; tests are never automatically submitted without confirmation.
+8. **Reduce Memory Load**: Target role, difficulty level, current question number, and progress meters remain persistently visible.
 
 ---
 
-## 7. MCQ and Text-Based Interview Modes
+## 7. Supported Engineering Tracks & Difficulty Tiers
 
-### Mode A: MCQ-Based Interview
-- **Format**: 4 distinct options (A, B, C, D) per question.
-- **Correctness Guard**: Correct answers and explanations are hidden during an active test to guarantee honesty.
-- **Evaluation**: Deterministic server-side evaluation (`is_correct = (selected == correct_option)`). Zero AI hallucination or latency.
-- **Navigation**: Previous/Next buttons, question jump palette, progress indicator, and final review confirmation modal.
-- **Post-Submission**: Detailed breakdown showing your choice, the correct option, correct/incorrect status badge, and comprehensive technical explanation.
+### Tracks
+1. **Frontend Developer**: Modern React architecture, TypeScript, DOM internals, CSS architecture, Core Web Vitals, state management.
+2. **Backend Developer**: REST APIs, database indexing, caching strategies, microservices architecture, API authentication.
+3. **Python Developer**: Asyncio, GIL, memory management, generators, decorators, clean object-oriented design.
+4. **Java Developer**: JVM internals, Spring Boot ecosystem, thread safety, garbage collection tuning, Hibernate.
+5. **DevOps Engineer**: Containerisation, Kubernetes, CI/CD pipelines, Terraform, Linux networking, high availability.
+6. **Data Analyst**: Complex SQL queries, window functions, pandas, data validation, metrics definition, statistical insights.
 
-### Mode B: Text-Based Technical Interview
-- **Format**: Multiline text editor supporting architectural explanations and code snippets.
-- **Evaluation**: Sent to Google Gemini API and evaluated across 6 criteria:
-  1. Technical correctness
-  2. Relevance to question
-  3. Conceptual depth
-  4. Clarity & organization
-  5. Completeness
-  6. Missing technical keywords
-- **Output**: Integer score (0 to 10), bulleted strengths, missing concepts, actionable advice, and an ideal engineering model answer.
+### Difficulty Levels
+- **Junior**: Fundamental syntax, standard libraries, data structures, and foundational concepts.
+- **Mid-Level**: Design patterns, API optimization, error handling, and database query tuning.
+- **Senior**: Distributed systems, architectural trade-offs, scalability, and system reliability.
 
 ---
 
-## 8. Functional Modules
-```
-[User Auth] ──> [Configuration] ──> [AI Question Generator] ──> [Workspace (MCQ/Text)]
-     │                                                                 │
-     ▼                                                                 ▼
-[Dashboard] <── [Analytics Engine] <── [DB Persistence] <── [Evaluation Engine]
-     │
-     ├──> [Question of the Day]
-     ├──> [Saved Questions Notebook]
-     └──> [Weak Topics Recommender]
-```
+## 8. Practice Formats
+
+### Format A: Multiple Choice Practice
+- **Format**: Curated 4-option questions (A, B, C, D).
+- **Integrity**: Correct answers and explanations are hidden during active testing to ensure honest self-assessment.
+- **Evaluation**: Instant deterministic scoring on submission (`is_correct = (selected == correct_option)`).
+- **Navigation**: Previous/Next navigation, question jump palette, progress meter, and confirmation modal.
+- **Review**: Detailed breakdown displaying candidate choice, correct answer, status badges, and thorough technical explanations.
+
+### Format B: Written Answers Practice
+- **Format**: Comfortable multiline response editor for articulating system design trade-offs, algorithms, and technical concepts.
+- **Evaluation**: Reviewed against key evaluation dimensions:
+  1. Conceptual correctness
+  2. Technical depth and mechanics
+  3. Clarity and structure
+  4. Practical trade-offs and real-world examples
+  5. Essential terminology coverage
+- **Output**: Constructive 0-to-10 score, "What You Did Well", "Key Concepts to Review", practical suggestions for improvement, and a complete engineering sample answer.
 
 ---
 
-## 9. Technology Stack
+## 9. Core Functional Modules
+1. **User Authentication & Session Security**: Registration, secure login, password hashing, and JWT token isolation.
+2. **Practice Session Configuration**: Guided setup for role, difficulty tier, format, and question count.
+3. **Multiple-Choice Workspace**: Distraction-free question workspace with question palette navigation.
+4. **Written-Answer Workspace**: Multiline answer editor with instant answer review and sample answer comparison.
+5. **Question Generation Service**: Structured service layer that provides relevant questions for the selected role and tier.
+6. **Answer Evaluation Engine**: Deterministic MCQ grading and structured rubric-based written evaluation.
+7. **Scorecard & Detailed Review**: Final scores, points earned, question breakdowns, and explanations.
+8. **Progress Tracking**: Aggregated database statistics tracking sessions, accuracy, and scores over time.
+9. **Topics to Revisit**: Diagnostic detection of concepts with <60% accuracy with direct one-click practice links.
+10. **Practice History**: Searchable, chronological archive of past sessions with quick resumption and review actions.
+11. **Saved Questions (Revision Notebook)**: Personal notebook to bookmark questions, sample answers, and explanations.
+12. **Question of the Day**: Rotating daily challenge that builds habit with duplicate attempt prevention.
+13. **Account & Profile Settings**: Clean account information, session security overview, and logout control.
+
+---
+
+## 10. Technology Stack
 
 ### Frontend
 - **Framework**: Next.js 16 (App Router, Turbopack, React 19)
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
+- **Styling**: Tailwind CSS v4 with custom earthy theme tokens
 - **Icons**: Lucide React
-- **Architecture**: Modular components, React Context state management, custom API fetch client.
+- **Architecture**: Modular components, React Context state management, custom typed fetch client
 
 ### Backend
 - **Framework**: Python FastAPI
 - **Data Validation**: Pydantic v2 & Pydantic-Settings
-- **ORM & Database**: SQLAlchemy 2.0 (PostgreSQL in production, SQLite for local testing)
+- **ORM & Database**: SQLAlchemy 2.0 (PostgreSQL in production, SQLite fallback for local testing)
 - **Security**: Native Bcrypt password hashing, Python-Jose (JWT HS256 tokens)
-- **AI Integration**: Google Gemini API via asynchronous `httpx` with JSON schema enforcement.
+- **Content Service Layer**: Asynchronous content generation service with structured schema parsing and resilience engine
 - **Testing**: Pytest & Pytest-Asyncio
 
 ---
 
-## 10. System Architecture
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Next.js Frontend                       │
-│     (Landing, Dashboard, Workspace, Results, Bookmarks)     │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTPS / JSON (REST API)
-┌──────────────────────────────▼──────────────────────────────┐
-│                    FastAPI Backend Service                  │
-│  ┌─────────────────┬───────────────────┬─────────────────┐  │
-│  │ Auth & Security │ Interview Service │ Analytics Engine│  │
-│  └────────┬────────┴─────────┬─────────┴────────┬────────┘  │
-└───────────┼──────────────────┼──────────────────┼───────────┘
-            │                  │                  │
-            ▼                  ▼                  ▼
-   ┌─────────────────┐ ┌───────────────┐ ┌────────────────┐
-   │   PostgreSQL    │ │ Google Gemini │ │ Heuristic Fall-│
-   │    Database     │ │    API (LLM)  │ │   back Engine  │
-   └─────────────────┘ └───────────────┘ └────────────────┘
+## 11. System Architecture
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                       Next.js Frontend                          │
+│     (Landing, Dashboard, Workspace, Results, Bookmarks, Daily)  │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │ HTTPS / JSON (REST API)
+┌────────────────────────────────▼────────────────────────────────┐
+│                     FastAPI Backend Service                     │
+│  ┌──────────────────┬───────────────────┬──────────────────┐    │
+│  │ Auth & Security  │ Practice Service  │ Analytics Engine │    │
+│  └─────────┬────────┴─────────┬─────────┴─────────┬────────┘    │
+└────────────┼──────────────────┼───────────────────┼─────────────┘
+             │                  │                   │
+             ▼                  ▼                   ▼
+    ┌─────────────────┐ ┌────────────────┐  ┌──────────────────┐
+    │   PostgreSQL    │ │ Content Engine │  │ Local Resilience │
+    │    Database     │ │ Service Layer  │  │  Domain Engine   │
+    └─────────────────┘ └────────────────┘  └──────────────────┘
 ```
 
 ---
 
-## 11. Project Directory Structure
+## 12. Project Directory Structure
 ```text
 MockMate/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── __init__.py
-│   │   │   ├── auth.py          # Register, login, me
-│   │   │   ├── interviews.py    # Create, answer, complete, results
-│   │   │   ├── bookmarks.py     # List, add, remove saved questions
-│   │   │   ├── daily.py         # Question of the Day & attempts
-│   │   │   ├── dashboard.py     # Aggregated telemetry & KPIs
-│   │   │   └── health.py        # System health & DB heartbeat
+│   │   │   ├── auth.py          # Registration, login, current user
+│   │   │   ├── interviews.py    # Session creation, answer submission, results
+│   │   │   ├── bookmarks.py     # Bookmark management
+│   │   │   ├── daily.py         # Question of the Day & attempt tracking
+│   │   │   ├── dashboard.py     # Aggregated summary & KPIs
+│   │   │   └── health.py        # System health & database heartbeat
 │   │   ├── core/
-│   │   │   ├── config.py        # Pydantic BaseSettings
+│   │   │   ├── config.py        # Application configuration & settings
 │   │   │   ├── database.py      # SQLAlchemy engine & sessionmaker
-│   │   │   └── security.py      # Bcrypt hash & JWT encode/decode
+│   │   │   └── security.py      # Bcrypt password hashing & JWT handling
 │   │   ├── models/
 │   │   │   ├── __init__.py
 │   │   │   ├── user.py          # Users table
 │   │   │   ├── interview.py     # Interviews table
 │   │   │   ├── question.py      # Questions table
 │   │   │   ├── answer.py        # Evaluated answers table
-│   │   │   ├── bookmark.py      # Saved questions table
+│   │   │   ├── bookmark.py      # Bookmarks table
 │   │   │   └── daily.py         # DailyQuestions & DailyAttempts tables
 │   │   ├── schemas/
 │   │   │   ├── __init__.py
-│   │   │   ├── auth.py          # Request & response Pydantic models
-│   │   │   ├── interview.py
-│   │   │   ├── question.py
-│   │   │   ├── answer.py
-│   │   │   ├── bookmark.py
-│   │   │   ├── daily.py
-│   │   │   └── dashboard.py
+│   │   │   ├── auth.py          # Authentication schemas
+│   │   │   ├── interview.py     # Interview schemas
+│   │   │   ├── question.py      # Question schemas
+│   │   │   ├── answer.py        # Answer schemas
+│   │   │   ├── bookmark.py      # Bookmark schemas
+│   │   │   ├── daily.py         # Daily question schemas
+│   │   │   └── dashboard.py     # Dashboard metrics schemas
 │   │   ├── services/
-│   │   │   ├── auth_service.py       # Authentication logic
-│   │   │   ├── ai_service.py         # Google Gemini integration & fallbacks
-│   │   │   ├── interview_service.py  # Session lifecycle
-│   │   │   ├── evaluation_service.py # MCQ & Text scoring logic
-│   │   │   └── analytics_service.py  # KPI aggregation & weak topics
+│   │   │   ├── auth_service.py       # Authentication business logic
+│   │   │   ├── ai_service.py         # Content generation service & fallbacks
+│   │   │   ├── interview_service.py  # Interview lifecycle management
+│   │   │   ├── evaluation_service.py # MCQ & written answer grading
+│   │   │   └── analytics_service.py  # Progress calculations & weak topics
 │   │   └── main.py              # FastAPI application entrypoint
 │   ├── tests/
-│   │   ├── conftest.py          # Pytest fixtures & in-memory test DB
-│   │   ├── test_auth.py         # 6 authentication test cases
-│   │   └── test_interviews.py   # 6 interview & analytics test cases
+│   │   ├── conftest.py          # Pytest fixtures & isolated test DB
+│   │   ├── test_auth.py         # Authentication test cases
+│   │   └── test_interviews.py   # Interview workflows & analytics tests
 │   └── requirements.txt         # Backend Python dependencies
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── layout.tsx       # Root layout & AuthProvider
+│   │   │   ├── globals.css      # Theme variables & custom scrollbars
 │   │   │   ├── page.tsx         # Landing page
 │   │   │   ├── login/page.tsx   # Login page
 │   │   │   ├── register/page.tsx# Registration page
-│   │   │   ├── dashboard/page.tsx   # Main Dashboard
+│   │   │   ├── dashboard/page.tsx   # Dashboard
 │   │   │   ├── interviews/
-│   │   │   │   ├── new/page.tsx     # Configuration page
+│   │   │   │   ├── new/page.tsx     # Setup & configuration page
 │   │   │   │   └── [id]/
-│   │   │   │       ├── page.tsx     # Active Workspace
-│   │   │   │       └── results/page.tsx # Scorecard & Review
-│   │   │   ├── history/page.tsx     # History list
-│   │   │   ├── bookmarks/page.tsx   # Saved Questions
-│   │   │   ├── daily/page.tsx       # Question of the Day
-│   │   │   ├── analytics/page.tsx   # Progress Analytics
-│   │   │   └── profile/page.tsx     # Profile & Settings
+│   │   │   │       ├── page.tsx     # Distraction-free question workspace
+│   │   │   │       └── results/page.tsx # Scorecard & review page
+│   │   │   ├── history/page.tsx     # Practice history
+│   │   │   ├── bookmarks/page.tsx   # Saved questions notebook
+│   │   │   ├── daily/page.tsx       # Question of the day
+│   │   │   ├── analytics/page.tsx   # Your progress
+│   │   │   └── profile/page.tsx     # Profile & settings
 │   │   ├── components/
-│   │   │   ├── Navbar.tsx       # Navigation bar
-│   │   │   ├── Sidebar.tsx      # Responsive desktop/mobile sidebar
-│   │   │   └── AppLayout.tsx    # Auth guard & unified layout
+│   │   │   ├── Navbar.tsx       # Header navigation
+│   │   │   ├── Sidebar.tsx      # Sidebar navigation
+│   │   │   └── AppLayout.tsx    # Auth guard & page shell
 │   │   ├── context/
-│   │   │   └── AuthContext.tsx  # User state & JWT persistence
+│   │   │   └── AuthContext.tsx  # Auth state & token storage
 │   │   ├── lib/
-│   │   │   └── api.ts           # Fetch API client with Bearer headers
+│   │   │   └── api.ts           # Fetch client with auth headers
 │   │   └── types/
-│   │       └── index.ts         # TypeScript entity definitions
+│   │       └── index.ts         # TypeScript data types
 │   ├── package.json
 │   └── tsconfig.json
 │
@@ -231,82 +254,23 @@ MockMate/
 
 ---
 
-## 12. Application Workflow
-1. **Registration / Login**: User creates an account; credentials hashed via Bcrypt; JWT token returned and stored in localStorage.
-2. **Configuration**: User chooses Role, Difficulty, Mode (MCQ or Text), and Question count (3, 5, or 10).
-3. **Session Creation**: Backend validates configuration, queries Gemini API for structured JSON questions, and persists an in-progress session.
-4. **Active Workspace**: User answers questions, navigates using the question palette, and submits answers.
-5. **Evaluation**:
-   - For MCQ: Deterministic server-side evaluation.
-   - For Text: Gemini evaluates depth, correctness, missing concepts, tips, and model answer.
-6. **Scorecard**: Complete interview finalized; percentage calculated; answers, explanations, and model answers unlocked.
-7. **Telemetry & Revision**: Dashboard metrics, role breakdowns, and weak topics automatically update; candidate bookmarks difficult questions.
-
----
-
-## 13. Database Schema and Relationships
-- **users**: `id (PK)`, `email (Unique)`, `hashed_password`, `full_name`, `created_at`, `updated_at`.
-- **interviews**: `id (PK)`, `user_id (FK -> users.id)`, `job_role`, `difficulty`, `mode`, `num_questions`, `status`, `total_score`, `max_score`, `percentage`, `created_at`, `completed_at`.
-- **questions**: `id (PK)`, `interview_id (FK -> interviews.id)`, `question_text`, `role`, `difficulty`, `topic`, `question_type`, `options (JSON)`, `correct_option`, `explanation`, `model_answer`, `created_at`.
-- **answers**: `id (PK)`, `interview_id (FK -> interviews.id)`, `question_id (FK -> questions.id)`, `user_id (FK -> users.id)`, `selected_option`, `text_answer`, `is_correct`, `score`, `feedback`, `strengths (JSON)`, `missing_concepts (JSON)`, `improvement_tips (JSON)`, `model_answer`, `evaluated_at`.
-- **bookmarks**: `id (PK)`, `user_id (FK -> users.id)`, `question_id (FK -> questions.id)`, `created_at`, `UniqueConstraint(user_id, question_id)`.
-- **daily_questions**: `id (PK)`, `date (Unique Date)`, `question_text`, `role`, `difficulty`, `topic`, `question_type`, `options (JSON)`, `correct_option`, `explanation`, `model_answer`, `created_at`.
-- **daily_attempts**: `id (PK)`, `user_id (FK -> users.id)`, `daily_question_id (FK -> daily_questions.id)`, `submitted_answer`, `is_correct`, `score`, `feedback`, `created_at`, `UniqueConstraint(user_id, daily_question_id)`.
-
----
-
-## 14. API Endpoint Documentation
-
-### Authentication
-- `POST /api/auth/register` — Register a new account.
-- `POST /api/auth/login` — Authenticate and receive JWT access token.
-- `POST /api/auth/logout` — Invalidate client session.
-- `GET /api/auth/me` — Retrieve current authenticated user profile.
-
-### Interview Management
-- `POST /api/interviews/create` — Configure and start a new interview session.
-- `GET /api/interviews` — List all interview sessions for authenticated user.
-- `GET /api/interviews/{id}` — Get active or completed interview session details.
-- `POST /api/interviews/{id}/submit-answer` — Submit single question answer.
-- `POST /api/interviews/{id}/submit-batch` — Submit all answers and complete session.
-- `POST /api/interviews/{id}/complete` — Finalize score and mark session completed.
-- `GET /api/interviews/{id}/results` — Get full scorecard and explanations.
-
-### Bookmarks
-- `GET /api/bookmarks` — List all bookmarked questions for user.
-- `POST /api/bookmarks/{question_id}` — Save question to revision notebook.
-- `DELETE /api/bookmarks/{question_id}` — Remove question from bookmarks.
-
-### Question of the Day
-- `GET /api/daily` — Fetch today's featured question.
-- `POST /api/daily/attempt` — Submit today's answer (locks after 1 attempt).
-
-### Dashboard & Analytics
-- `GET /api/dashboard` — Fetch KPI summaries, role stats, weak topics, and trends.
-
-### System Health
-- `GET /api/health` — Service and database connection heartbeat.
-
----
-
-## 15. Prerequisites
+## 13. Prerequisites
 - **Python**: 3.10, 3.11, 3.12, 3.13, or 3.14
 - **Node.js**: v18+, v20+ (LTS recommended)
 - **Package Managers**: `pip` and `npm`
-- **PostgreSQL**: Optional locally (defaults to SQLite if PostgreSQL not running; PostgreSQL used in Render production).
+- **PostgreSQL**: Optional for local development (defaults to SQLite if PostgreSQL is not active; PostgreSQL used in production).
 
 ---
 
-## 16. Local Installation Instructions
+## 14. Local Installation Instructions
+
 Clone the repository:
 ```bash
 git clone https://github.com/sinalkarpratik3-ai/MockMate.git
 cd MockMate
 ```
 
----
-
-## 17. Frontend Setup
+### Frontend Setup
 ```bash
 cd frontend
 npm install
@@ -317,9 +281,7 @@ Configure `.env.local` inside `frontend/`:
 NEXT_PUBLIC_API_URL=http://localhost:8000/api
 ```
 
----
-
-## 18. Backend Setup
+### Backend Setup
 ```bash
 cd backend
 python -m venv .venv
@@ -335,57 +297,29 @@ pip install -r requirements.txt
 
 ---
 
-## 19. PostgreSQL Setup
-For local PostgreSQL (optional):
-```sql
-CREATE DATABASE mockmate;
-CREATE USER mockmate_user WITH ENCRYPTED PASSWORD 'secure_password';
-GRANT ALL PRIVILEGES ON DATABASE mockmate TO mockmate_user;
-```
-Update `DATABASE_URL` in `backend/.env`:
+## 15. Technical Content Service Configuration
+The backend includes a pluggable content generation layer for generating dynamic questions and reviewing written responses:
+1. If using an external generation service, set `GEMINI_API_KEY` in `backend/.env`:
 ```env
-DATABASE_URL=postgresql://mockmate_user:secure_password@localhost:5432/mockmate
-```
-*(If omitted, MockMate automatically defaults to local SQLite `sqlite:///./mockmate.db`).*
-
----
-
-## 20. Gemini API Configuration
-1. Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
-2. Add your key to `backend/.env`:
-```env
-GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere
+GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-1.5-flash
 ```
-*(If no key is provided, MockMate runs seamlessly using its built-in verified engineering question generator).*
+2. If no external key is configured, MockMate seamlessly activates its verified domain engineering bank to guarantee 100% operational uptime without interruption.
 
 ---
 
-## 21. Environment Variable Reference
+## 16. Environment Variables Reference
 | Variable | Required | Description | Default |
 |---|---|---|---|
 | `DATABASE_URL` | No | PostgreSQL / SQLite connection string | `sqlite:///./mockmate.db` |
-| `SECRET_KEY` | Yes (in prod) | Secret key for JWT hashing | `super-secret-jwt-key` |
-| `GEMINI_API_KEY` | Optional | Google Gemini API Key | `""` |
-| `GEMINI_MODEL` | No | Gemini model name | `gemini-1.5-flash` |
-| `NEXT_PUBLIC_API_URL` | Yes | Backend API URL for frontend | `http://localhost:8000/api` |
+| `SECRET_KEY` | Yes (in prod) | Secret key for JWT encryption | `super-secret-jwt-key` |
+| `GEMINI_API_KEY` | Optional | Content generation service key | `""` |
+| `GEMINI_MODEL` | No | Model name | `gemini-1.5-flash` |
+| `NEXT_PUBLIC_API_URL` | Yes | Backend API URL for frontend client | `http://localhost:8000/api` |
 
 ---
 
-## 22. Database Migration Instructions
-Database tables are automatically created on backend startup via SQLAlchemy lifespan hooks (`Base.metadata.create_all(bind=engine)`).
-
-For Alembic migrations:
-```bash
-cd backend
-alembic init alembic
-alembic revision --autogenerate -m "Initial schema"
-alembic upgrade head
-```
-
----
-
-## 23. How to Run the Application Locally
+## 17. Running the Application Locally
 
 ### Start Backend
 ```bash
@@ -393,19 +327,19 @@ cd backend
 .venv\Scripts\Activate.ps1
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-API runs at: `http://127.0.0.1:8000` (Swagger docs at `http://127.0.0.1:8000/api/docs`).
+API runs at `http://127.0.0.1:8000` (Interactive API docs at `http://127.0.0.1:8000/api/docs`).
 
 ### Start Frontend
 ```bash
 cd frontend
 npm run dev
 ```
-Web app runs at: `http://localhost:3000`.
+Web application runs at `http://localhost:3000`.
 
 ---
 
-## 24. How to Run Tests
-MockMate includes 12 automated unit and integration tests covering Authentication, Interview Lifecycle, MCQ Deterministic Scoring, Text Rubric Evaluation, Bookmarks, and Analytics Isolation.
+## 18. Running the Test Suite
+MockMate includes 12 automated unit and integration tests covering authentication, session lifecycle, deterministic MCQ grading, written evaluation rubrics, question bookmarks, daily challenge locking, and user data isolation:
 
 ```bash
 cd backend
@@ -415,82 +349,34 @@ pytest tests -v
 
 Expected output:
 ```text
-======================= 12 passed in 9.91s ========================
+======================= 12 passed in 10.32s ========================
 ```
 
 ---
 
-## 25. GitHub Workflow
-1. Check repository status:
-   ```bash
-   git status
-   ```
-2. Add modified files and commit:
-   ```bash
-   git add .
-   git commit -m "feat: complete AI interview preparation simulator implementation"
-   ```
-3. Push to your repository:
-   ```bash
-   git push origin main
-   ```
+## 19. Render Deployment Guide
+The project includes a complete Render Blueprint (`render.yaml`):
 
----
-
-## 26. Render Deployment Guide
-
-### Deploying via Render Blueprint (`render.yaml`):
-1. Push your code to GitHub at `https://github.com/sinalkarpratik3-ai/MockMate`.
-2. Log in to [Render Dashboard](https://dashboard.render.com/).
-3. Click **New +** &gt; **Blueprint**.
-4. Connect the `MockMate` GitHub repository.
-5. Render will detect `render.yaml` and automatically configure:
-   - **PostgreSQL Database**: `mockmate-db` (Free tier)
+1. Push your repository to GitHub: `https://github.com/sinalkarpratik3-ai/MockMate`.
+2. In the [Render Dashboard](https://dashboard.render.com/), click **New +** &rarr; **Blueprint**.
+3. Select your `MockMate` repository.
+4. Render automatically configures:
+   - **PostgreSQL Database**: `mockmate-db`
    - **FastAPI Web Service**: `mockmate-backend`
    - **Next.js Web Service**: `mockmate-frontend`
-6. Add your `GEMINI_API_KEY` under the backend service environment variables.
-7. Click **Apply**. Render will deploy the database and both services.
+5. Set `GEMINI_API_KEY` in the backend service environment settings if using an external generation service.
+6. Click **Apply** to deploy the database and web services.
 
 ---
 
-## 27. Production Configuration
-- Backend binds to `0.0.0.0:$PORT` dynamically as required by Render.
-- Frontend connects to `NEXT_PUBLIC_API_URL` pointing to the deployed backend URL.
-- CORS is configured to accept requests from the deployed web frontend.
-- Production PostgreSQL connection strings starting with `postgres://` are automatically normalized to `postgresql://` in `config.py`.
-
----
-
-## 28. Security Considerations
-- Passwords are encrypted using salted Bcrypt (rounds=12). Plaintext passwords are never stored.
+## 20. Security and Data Protection
+- Passwords are encrypted using salted Bcrypt (rounds=12); plaintext passwords are never stored.
 - JWT tokens expire after 24 hours (`HS256` signature algorithm).
-- All protected endpoints enforce user ownership (`interview.user_id == current_user.id`).
-- Secrets and credentials are never checked into git. `.env` is strictly excluded via `.gitignore`.
-- Inputs are strictly validated via Pydantic schemas.
+- All protected endpoints enforce strict user ownership (`interview.user_id == current_user.id`).
+- Secrets and credentials are strictly excluded via `.gitignore`.
+- Inputs are validated via Pydantic schemas before reaching the database.
 
 ---
 
-## 29. Troubleshooting
-- **CORS Error**: Ensure `NEXT_PUBLIC_API_URL` matches the exact URL of your backend service.
-- **Port In Use**: Change `--port 8000` to `--port 8001` or kill conflicting processes.
-- **Gemini Quota Exceeded**: MockMate automatically activates its verified domain question generator without crashing.
-- **Database Connection Error**: Verify PostgreSQL service is healthy on Render or that local `DATABASE_URL` is accessible.
-
----
-
-## 30. Known Limitations
-- Voice/Audio recording mode is not part of this text/MCQ release.
-- Free-tier Render web services spin down after 15 minutes of inactivity; initial cold start may take 30-50 seconds.
-
----
-
-## 31. Future Enhancements
-- Real-time speech-to-text audio interview simulation using WebRTC.
-- Collaborative mock interviews with peer-to-peer room sharing.
-- Resume upload & parsing to tailor questions specifically to past experience.
-- Export scorecard as a verified PDF certificate.
-
----
-
-## 32. License
+## 21. License
 This project is licensed under the MIT License.
