@@ -1,0 +1,49 @@
+services:
+  # Backend FastAPI Web Service
+  - type: web
+    name: mockmate-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mockmate-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+
+  # Frontend Next.js Web Service
+  - type: web
+    name: mockmate-frontend
+    env: node
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: mockmate-backend
+          envVarKey: RENDER_EXTERNAL_URL
+          # Appends /api route to the deployed backend url
+      - key: NODE_VERSION
+        value: 20.18.0
+
+databases:
+  # Managed PostgreSQL Database
+  - name: mockmate-db
+    region: oregon
+    plan: free
+    databaseName: mockmate
+    user: mockmate_user
