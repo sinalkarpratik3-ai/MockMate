@@ -1,7 +1,66 @@
 import re
 import string
 import random
-from typing import List, Dict, Any, Optional
+import json
+from typing import List, Dict, Any, Optional, Tuple
+
+def shuffle_mcq_options(options: Any, correct_option: Optional[str]) -> Tuple[List[Dict[str, str]], str]:
+    """
+    Randomly shuffles MCQ options and re-keys them (A, B, C, D) while updating
+    the correct_option key to match the new position of the correct answer.
+    Guarantees equal random distribution across options A, B, C, D.
+    """
+    if not options:
+        return [], "A"
+
+    if isinstance(options, str):
+        try:
+            options_list = json.loads(options)
+        except Exception:
+            return options, correct_option or "A"
+    elif isinstance(options, list):
+        options_list = [dict(opt) if isinstance(opt, dict) else {"text": str(opt)} for opt in options]
+    else:
+        return options, correct_option or "A"
+
+    if len(options_list) < 2:
+        return options_list, correct_option or "A"
+
+    target_key = (correct_option or "A").strip().upper()
+
+    # Locate the correct option item
+    correct_item = None
+    for opt in options_list:
+        if str(opt.get("key", "")).strip().upper() == target_key:
+            correct_item = opt
+            break
+
+    if correct_item is None and options_list:
+        correct_item = options_list[0]
+
+    # Tag each item so we know which one was correct regardless of text collisions
+    tagged = []
+    for opt in options_list:
+        tagged.append({
+            "text": opt.get("text", "") if isinstance(opt, dict) else str(opt),
+            "is_correct": (opt is correct_item)
+        })
+
+    # Shuffle the options randomly
+    random.shuffle(tagged)
+
+    # Re-assign standard keys A, B, C, D...
+    keys = ["A", "B", "C", "D", "E", "F"]
+    new_options = []
+    new_correct_key = "A"
+
+    for idx, item in enumerate(tagged):
+        k = keys[idx] if idx < len(keys) else chr(65 + idx)
+        new_options.append({"key": k, "text": item["text"]})
+        if item["is_correct"]:
+            new_correct_key = k
+
+    return new_options, new_correct_key
 
 # ==============================================================================
 # 1. TEXT NORMALIZATION & NEAR-DUPLICATE DETECTION

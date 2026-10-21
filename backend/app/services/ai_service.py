@@ -15,6 +15,7 @@ from app.services.question_banks import (
     is_duplicate_or_near_duplicate,
     get_round_difficulty,
     adapt_difficulty,
+    shuffle_mcq_options,
 )
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ Mandatory Rules:
 2. Question 1 (Round 1) MUST be Easy and test fundamental concepts or definitions of {role}.
 3. Subsequent questions must follow the designated progressive difficulty.
 4. Every question must be genuinely distinct with zero duplicate or near-duplicate concepts.
-5. If mode is 'mcq', provide exactly 4 distinct, plausible options ('A', 'B', 'C', 'D'), a correct_option key, and a clear explanation.
+5. If mode is 'mcq', provide exactly 4 distinct, plausible options ('A', 'B', 'C', 'D'). Randomly distribute the correct answer across 'A', 'B', 'C', or 'D' (DO NOT always make it 'A'). Provide the corresponding correct_option key, and a clear explanation.
 6. If mode is 'text', provide a comprehensive ideal model_answer.
 7. Return strict JSON matching the schema below.
 
@@ -160,7 +161,7 @@ JSON Schema:
         {{"key": "C", "text": "option 3"}},
         {{"key": "D", "text": "option 4"}}
       ],
-      "correct_option": "A",
+      "correct_option": "C",
       "explanation": "string",
       "model_answer": null
     }}
@@ -191,7 +192,8 @@ JSON Schema:
 
                         if mode == "mcq":
                             opts = q.get("options", [])
-                            if len(opts) == 4 and q.get("correct_option") in ["A", "B", "C", "D"]:
+                            if len(opts) == 4:
+                                shuffled_opts, shuffled_key = shuffle_mcq_options(opts, q.get("correct_option"))
                                 valid_questions.append({
                                     "question_text": q_text,
                                     "role": role,
@@ -199,8 +201,8 @@ JSON Schema:
                                     "difficulty": assigned_diff,
                                     "topic": q.get("topic", random.choice(sampled_topics)),
                                     "question_type": "mcq",
-                                    "options": json.dumps(opts),
-                                    "correct_option": q.get("correct_option"),
+                                    "options": json.dumps(shuffled_opts),
+                                    "correct_option": shuffled_key,
                                     "explanation": q.get("explanation", ""),
                                     "model_answer": None
                                 })
@@ -314,6 +316,17 @@ JSON Schema:
 
             chosen_texts.append(candidate["question_text"])
 
+            if mode == "mcq" and candidate.get("options"):
+                shuffled_opts, shuffled_key = shuffle_mcq_options(
+                    candidate["options"],
+                    candidate.get("correct_option", "A")
+                )
+                final_options = json.dumps(shuffled_opts)
+                final_correct = shuffled_key
+            else:
+                final_options = None
+                final_correct = None
+
             item = {
                 "question_text": candidate["question_text"],
                 "role": role,
@@ -321,8 +334,8 @@ JSON Schema:
                 "difficulty": target_diff,
                 "topic": candidate.get("topic", f"{role} Core Knowledge"),
                 "question_type": mode,
-                "options": json.dumps(candidate["options"]) if mode == "mcq" and isinstance(candidate.get("options"), list) else candidate.get("options"),
-                "correct_option": candidate.get("correct_option") if mode == "mcq" else None,
+                "options": final_options,
+                "correct_option": final_correct,
                 "explanation": candidate.get("explanation") if mode == "mcq" else None,
                 "model_answer": candidate.get("model_answer") if mode == "text" else None
             }
@@ -347,16 +360,18 @@ JSON Schema:
         seed_id = len(seen_texts) + 1
 
         if mode == "mcq":
+            raw_options = [
+                {"key": "A", "text": f"By isolating {chosen_topic} responsibilities using clear architectural abstractions"},
+                {"key": "B", "text": "By hardcoding global mutable variables across all modules"},
+                {"key": "C", "text": "By bypassing runtime validation and error handlers"},
+                {"key": "D", "text": "By duplicating code routines across separate processes"}
+            ]
+            shuffled_opts, shuffled_key = shuffle_mcq_options(raw_options, "A")
             return {
                 "question_text": f"In {role} engineering, how is {chosen_topic} primarily implemented to optimize system maintainability and performance (Scenario #{seed_id})?",
                 "topic": chosen_topic,
-                "options": [
-                    {"key": "A", "text": f"By isolating {chosen_topic} responsibilities using clear architectural abstractions"},
-                    {"key": "B", "text": "By hardcoding global mutable variables across all modules"},
-                    {"key": "C", "text": "By bypassing runtime validation and error handlers"},
-                    {"key": "D", "text": "By duplicating code routines across separate processes"}
-                ],
-                "correct_option": "A",
+                "options": shuffled_opts,
+                "correct_option": shuffled_key,
                 "explanation": f"In production {role} systems, {chosen_topic} is implemented through modular abstractions and separation of concerns to ensure maintainability."
             }
         else:

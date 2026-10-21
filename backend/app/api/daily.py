@@ -13,6 +13,7 @@ from app.schemas.daily import DailyAttemptSubmit
 from app.services.auth_service import get_current_user
 from app.services.interview_service import InterviewService
 from app.services.ai_service import ai_service, FALLBACK_MCQ_BANK
+from app.services.question_banks import shuffle_mcq_options
 
 router = APIRouter(prefix="/daily", tags=["Question of the Day"])
 
@@ -37,6 +38,10 @@ async def _ensure_daily_question(db: AsyncSession) -> DailyQuestion:
         role_questions = [list(diff_map.values())[0][0]]
     q_data = role_questions[day_num % len(role_questions)]
 
+    raw_options = q_data.get("options", [])
+    raw_correct = q_data.get("correct_option", "A")
+    shuffled_opts, shuffled_key = shuffle_mcq_options(raw_options, raw_correct)
+
     new_daily = DailyQuestion(
         date=today,
         question_text=q_data["question_text"],
@@ -44,8 +49,8 @@ async def _ensure_daily_question(db: AsyncSession) -> DailyQuestion:
         difficulty="Mid-Level",
         topic=q_data["topic"],
         question_type="mcq",
-        options=json.dumps(q_data["options"]),
-        correct_option=q_data["correct_option"],
+        options=json.dumps(shuffled_opts),
+        correct_option=shuffled_key,
         explanation=q_data["explanation"],
         model_answer=None
     )

@@ -18,6 +18,7 @@ from app.services.question_banks import (
     get_round_difficulty,
     adapt_difficulty,
     is_duplicate_or_near_duplicate,
+    shuffle_mcq_options,
 )
 
 SUPPORTED_ROLES = [
@@ -158,6 +159,16 @@ class InterviewService:
             assigned_round = q_data.get("round_number", idx + 1)
             assigned_diff = q_data.get("difficulty", get_round_difficulty(assigned_round, num_questions))
 
+            raw_opts = q_data.get("options")
+            raw_corr = q_data.get("correct_option")
+            if mode == "mcq" and raw_opts:
+                shuffled_opts, shuffled_key = shuffle_mcq_options(raw_opts, raw_corr)
+                final_opts = json.dumps(shuffled_opts) if not isinstance(shuffled_opts, str) else shuffled_opts
+                final_corr = shuffled_key
+            else:
+                final_opts = raw_opts
+                final_corr = raw_corr
+
             db_question = Question(
                 interview_id=db_interview.id,
                 question_text=q_data["question_text"],
@@ -166,8 +177,8 @@ class InterviewService:
                 difficulty=assigned_diff,
                 topic=q_data["topic"],
                 question_type=mode,
-                options=q_data.get("options"),
-                correct_option=q_data.get("correct_option"),
+                options=final_opts,
+                correct_option=final_corr,
                 explanation=q_data.get("explanation"),
                 model_answer=q_data.get("model_answer")
             )

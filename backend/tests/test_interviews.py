@@ -248,3 +248,30 @@ def test_extended_roles_and_keywords_accepted(client, auth_headers):
         }, headers=auth_headers)
         assert res.status_code == 201, f"Failed for role '{test_role}': {res.text}"
 
+def test_mcq_options_shuffled_and_randomized(client, auth_headers):
+    # Create an MCQ interview with 10 questions
+    res = client.post("/api/interviews/create", json={
+        "job_role": "Python Developer",
+        "difficulty": "Mid-Level",
+        "mode": "mcq",
+        "num_questions": 10
+    }, headers=auth_headers)
+    assert res.status_code == 201
+    itv_id = res.json()["id"]
+
+    # Check results to inspect correct_option distribution
+    client.post(f"/api/interviews/{itv_id}/complete", headers=auth_headers)
+    res_results = client.get(f"/api/interviews/{itv_id}/results", headers=auth_headers)
+    assert res_results.status_code == 200
+    questions = res_results.json()["questions"]
+    assert len(questions) == 10
+
+    correct_options = [q["correct_option"] for q in questions if q.get("correct_option")]
+    for opt in correct_options:
+        assert opt in ["A", "B", "C", "D"]
+
+    # Options must NOT all be "A"
+    unique_options = set(correct_options)
+    assert len(unique_options) > 1, f"All 10 questions had the same correct option: {correct_options}"
+
+
