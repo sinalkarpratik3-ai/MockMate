@@ -18,10 +18,19 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const runtimeApiUrl =
-    process.env.NEXT_PUBLIC_API_URL ||
+  const rawBackend =
     process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
     "";
+
+  let runtimeApiUrl = "";
+  if (rawBackend && rawBackend.trim().length > 0) {
+    let trimmed = rawBackend.trim().replace(/\/+$/, "");
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+      trimmed = `https://${trimmed}`;
+    }
+    runtimeApiUrl = trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+  }
 
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>

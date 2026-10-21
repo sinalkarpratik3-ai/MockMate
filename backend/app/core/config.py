@@ -31,14 +31,20 @@ class Settings(BaseSettings):
         if url.startswith("sqlite://"):
             return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
         if url.startswith("postgres://"):
-            return url.replace("postgres://", "postgresql+asyncpg://", 1)
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        
+        # asyncpg does not accept libpq 'sslmode=' parameter; convert to asyncpg-supported 'ssl='
+        import re
+        if "sslmode=" in url:
+            url = re.sub(r'([?&])sslmode=([^&]+)', r'\1ssl=\2', url)
+
         return url
 
     # Gemini Integration
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.8-flash"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -51,6 +57,12 @@ class Settings(BaseSettings):
     
     @field_validator("DATABASE_URL", mode="before")
     def assemble_db_connection(cls, v: str) -> str:
+        # Prevent silent SQLite fallback on Render production
+        if os.getenv("RENDER") == "true" and (not v or "sqlite" in v):
+            raise ValueError(
+                "Production environment on Render detected, but no valid PostgreSQL DATABASE_URL was configured. "
+                "SQLite is disabled in production to prevent silent data loss across container restarts."
+            )
         if v and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql://", 1)
         return v

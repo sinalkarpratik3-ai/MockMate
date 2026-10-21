@@ -9,31 +9,44 @@ export class ApiError extends Error {
   }
 }
 
+export function normalizeApiUrl(rawUrl: string): string {
+  let trimmed = rawUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    trimmed = `https://${trimmed}`;
+  }
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
 export function getApiBaseUrl(): string {
+  const isBrowser = typeof window !== "undefined";
+  const isRemoteBrowser =
+    isBrowser &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1";
+
   // 1. Runtime script variable injected by RootLayout SSR inside container
-  if (typeof window !== "undefined" && (window as any).__MOCKMATE_API_URL__) {
+  if (isBrowser && (window as any).__MOCKMATE_API_URL__) {
     const runtimeUrl = String((window as any).__MOCKMATE_API_URL__).trim();
-    if (runtimeUrl.length > 0 && !runtimeUrl.includes("localhost:8000")) {
-      return runtimeUrl.endsWith("/api") ? runtimeUrl : `${runtimeUrl.replace(/\/+$/, "")}/api`;
+    if (runtimeUrl.length > 0) {
+      if (!isRemoteBrowser || (!runtimeUrl.includes("localhost") && !runtimeUrl.includes("127.0.0.1"))) {
+        return normalizeApiUrl(runtimeUrl);
+      }
     }
   }
 
   // 2. Build-time environment variable
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL;
   if (envUrl && envUrl.trim().length > 0) {
     const trimmed = envUrl.trim();
-    const isRemote =
-      typeof window !== "undefined" &&
-      window.location.hostname !== "localhost" &&
-      window.location.hostname !== "127.0.0.1";
-    if (!isRemote || !trimmed.includes("localhost:8000")) {
-      return trimmed.endsWith("/api") ? trimmed : `${trimmed.replace(/\/+$/, "")}/api`;
+    if (!isRemoteBrowser || (!trimmed.includes("localhost") && !trimmed.includes("127.0.0.1"))) {
+      return normalizeApiUrl(trimmed);
     }
   }
 
-  // 3. Known Render backend fallback
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com")) {
-    return "https://mockmate-backend-hhge.onrender.com/api";
+  // 3. Remote browser fallback: use same-origin /api proxied by Next.js server rewrites
+  if (isRemoteBrowser) {
+    return `${window.location.origin}/api`;
   }
 
   // 4. Default to localhost for local development
