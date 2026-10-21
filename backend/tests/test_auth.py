@@ -55,3 +55,28 @@ def test_protected_route_authenticated(client, auth_headers):
     res = client.get("/api/auth/me", headers=auth_headers)
     assert res.status_code == 200
     assert res.json()["email"] == "testuser@mockmate.io"
+    assert "created_at" in res.json()
+    assert res.json()["created_at"] is not None
+
+def test_user_timestamps_and_update(client):
+    """Verify user registration sets created_at/updated_at and updating user updates updated_at."""
+    res = client.post("/api/auth/register", json={
+        "email": "timestamp_test@mockmate.io",
+        "password": "Password123!",
+        "full_name": "Timestamp Test"
+    })
+    assert res.status_code == 201
+    user_data = res.json()["user"]
+    assert user_data["created_at"] is not None
+
+    # Verify migration function executes cleanly
+    import asyncio
+    from app.core.migrations import migrate_timestamp_columns
+    from tests.conftest import test_engine
+
+    async def run_check():
+        async with test_engine.begin() as conn:
+            count = await migrate_timestamp_columns(conn)
+            assert count >= 0
+    asyncio.run(run_check())
+

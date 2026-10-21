@@ -19,7 +19,7 @@ class Answer(Base):
     missing_concepts = Column(Text, nullable=True)  # JSON list string
     improvement_tips = Column(Text, nullable=True)  # JSON list string
     model_answer = Column(Text, nullable=True)
-    evaluated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    evaluated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     interview = relationship("Interview", back_populates="answers")
     question = relationship("Question", back_populates="answers")

@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.migrations import migrate_timestamp_columns
 import app.models  # Ensures all models are registered
 from app.api import api_router
 
@@ -15,9 +16,11 @@ logger = logging.getLogger("uvicorn.error")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure database tables exist asynchronously on startup
+    # Ensure database tables exist and schema migrations are applied on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if conn.dialect.name == "postgresql":
+            await migrate_timestamp_columns(conn)
     yield
     # Graceful connection pool disposal on shutdown
     await engine.dispose()

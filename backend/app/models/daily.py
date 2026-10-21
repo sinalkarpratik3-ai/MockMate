@@ -17,7 +17,7 @@ class DailyQuestion(Base):
     correct_option = Column(String(10), nullable=True)
     explanation = Column(Text, nullable=True)
     model_answer = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     attempts = relationship("DailyAttempt", back_populates="daily_question", cascade="all, delete-orphan")
 
@@ -31,7 +31,7 @@ class DailyAttempt(Base):
     is_correct = Column(Boolean, nullable=True)
     score = Column(Float, default=0.0)
     feedback = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("user_id", "daily_question_id", name="uq_user_daily_attempt"),

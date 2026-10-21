@@ -18,8 +18,8 @@ class Interview(Base):
     total_score = Column(Float, default=0.0)
     max_score = Column(Float, default=0.0)
     percentage = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="interviews")
     questions = relationship("Question", back_populates="interview", cascade="all, delete-orphan")

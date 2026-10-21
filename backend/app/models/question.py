@@ -18,7 +18,7 @@ class Question(Base):
     correct_option = Column(String(10), nullable=True)  # "A", "B", "C", "D"
     explanation = Column(Text, nullable=True)
     model_answer = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     interview = relationship("Interview", back_populates="questions")
     answers = relationship("Answer", back_populates="question", cascade="all, delete-orphan")
