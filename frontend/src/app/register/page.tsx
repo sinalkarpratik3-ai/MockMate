@@ -27,7 +27,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    if (!email || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       setError("Email and password are required.");
       return;
     }
@@ -44,10 +45,18 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await register(email, password, fullName.trim() || undefined);
+      await register(cleanEmail, password, fullName.trim() || undefined);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Failed to create account. Please try again.");
+      const msg = err?.message || "Failed to create account. Please try again.";
+      if (
+        typeof msg === "string" &&
+        (msg.includes("Failed to fetch") || msg.includes("Network connection error"))
+      ) {
+        setError("Unable to connect to the backend server. Please check that the backend is running on port 8000.");
+      } else {
+        setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
     } finally {
       setLoading(false);
     }

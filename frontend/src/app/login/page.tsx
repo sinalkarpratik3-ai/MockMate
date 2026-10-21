@@ -25,17 +25,26 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    if (!email || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       setError("Please fill in both email and password.");
       return;
     }
 
     setLoading(true);
     try {
-      await login(email, password);
+      await login(cleanEmail, password);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Invalid credentials. Please verify and try again.");
+      const msg = err?.message || "Invalid credentials. Please verify and try again.";
+      if (
+        typeof msg === "string" &&
+        (msg.includes("Failed to fetch") || msg.includes("Network connection error"))
+      ) {
+        setError("Unable to connect to the backend server. Please check that the backend is running on port 8000.");
+      } else {
+        setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
     } finally {
       setLoading(false);
     }

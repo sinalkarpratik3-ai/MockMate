@@ -59,7 +59,7 @@ if %errorlevel% equ 0 (
     echo  - Backend is already running on http://localhost:8000
 ) else (
     echo  - Starting FastAPI Backend on http://localhost:8000...
-    start "MockMate Backend API (FastAPI)" cmd /k "cd /d ""%~dp0backend"" && ""%PYTHON_CMD%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
+    start "MockMate Backend API (FastAPI)" cmd /k "cd /d ""%~dp0backend"" && ""%PYTHON_CMD%"" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 )
 
 :: Check if frontend is already listening on port 3000
