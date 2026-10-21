@@ -53,7 +53,7 @@ class AIService:
         }
 
         # Preferred models in order of capability & speed
-        models_to_try = [self.model, "gemini-3.8-flash", "gemini-3.5-flash-lite"]
+        models_to_try = [self.model, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
         unique_models = []
         for m in models_to_try:
             if m and m not in unique_models:
@@ -71,6 +71,9 @@ class AIService:
                             text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
                             if text_content:
                                 return text_content
+                    elif response.status_code in [401, 403]:
+                        logger.info(f"Gemini API authentication issue ({response.status_code}); seamlessly switching to domain generator.")
+                        break
                     else:
                         logger.warning(f"Gemini API ({model_name}) returned status {response.status_code}: {response.text[:200]}")
                 except Exception as e:

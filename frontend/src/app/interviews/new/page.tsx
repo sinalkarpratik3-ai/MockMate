@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
 import { Interview } from "@/types";
@@ -40,16 +40,57 @@ const DIFFICULTIES = [
   { id: "Senior", name: "Senior", desc: "System design, distributed architecture, scalability, complex trade-offs" },
 ];
 
-export default function NewInterviewPage() {
+function NewInterviewContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [selectedRoleId, setSelectedRoleId] = useState("Python Developer");
-  const [customRoleText, setCustomRoleText] = useState("");
-  const [selectedDifficulty, setSelectedDifficulty] = useState("Junior");
-  const [selectedMode, setSelectedMode] = useState<"mcq" | "text">("mcq");
-  const [questionCount, setQuestionCount] = useState(5);
+  const roleParam = searchParams.get("role") || "";
+  const diffParam = searchParams.get("difficulty") || "";
+  const modeParam = searchParams.get("mode") || "";
+  const countParam = parseInt(searchParams.get("count") || "0", 10);
+
+  const isPresetRole = ROLES.some((r) => r.id.toLowerCase() === roleParam.toLowerCase());
+  const initialRoleId = isPresetRole
+    ? ROLES.find((r) => r.id.toLowerCase() === roleParam.toLowerCase())!.id
+    : roleParam
+    ? "Custom"
+    : "Python Developer";
+
+  const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId);
+  const [customRoleText, setCustomRoleText] = useState(!isPresetRole && roleParam ? roleParam : "");
+  const [selectedDifficulty, setSelectedDifficulty] = useState(
+    ["Junior", "Mid-Level", "Senior"].includes(diffParam) ? diffParam : "Junior"
+  );
+  const [selectedMode, setSelectedMode] = useState<"mcq" | "text">(
+    modeParam === "text" ? "text" : "mcq"
+  );
+  const [questionCount, setQuestionCount] = useState(
+    [3, 5, 10].includes(countParam) ? countParam : 5
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (roleParam) {
+      const match = ROLES.find((r) => r.id.toLowerCase() === roleParam.toLowerCase());
+      if (match) {
+        setSelectedRoleId(match.id);
+        setCustomRoleText("");
+      } else {
+        setSelectedRoleId("Custom");
+        setCustomRoleText(roleParam);
+      }
+    }
+    if (diffParam && ["Junior", "Mid-Level", "Senior"].includes(diffParam)) {
+      setSelectedDifficulty(diffParam);
+    }
+    if (modeParam && ["mcq", "text"].includes(modeParam)) {
+      setSelectedMode(modeParam as "mcq" | "text");
+    }
+    if (countParam && [3, 5, 10].includes(countParam)) {
+      setQuestionCount(countParam);
+    }
+  }, [roleParam, diffParam, modeParam, countParam]);
 
   const effectiveRole = selectedRoleId === "Custom" ? customRoleText.trim() : selectedRoleId;
 
@@ -321,5 +362,22 @@ export default function NewInterviewPage() {
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+export default function NewInterviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppLayout>
+          <div className="py-24 flex flex-col items-center justify-center text-[#777B74]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#24483F] mb-3" />
+            <p className="text-xs font-semibold">Preparing setup...</p>
+          </div>
+        </AppLayout>
+      }
+    >
+      <NewInterviewContent />
+    </Suspense>
   );
 }

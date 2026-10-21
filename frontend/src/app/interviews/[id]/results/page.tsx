@@ -15,7 +15,8 @@ import {
   BookOpen, 
   AlertCircle, 
   Loader2,
-  Check
+  Check,
+  RotateCcw
 } from "lucide-react";
 
 function InterviewResultsContent() {
@@ -120,9 +121,20 @@ function InterviewResultsContent() {
     answerMap[ans.question_id] = ans;
   });
 
+  const totalQuestions = interview.questions?.length || 0;
+  const correctCount = interview.questions?.filter((q) => {
+    const a = answerMap[q.id];
+    return isMCQ ? a?.is_correct : (a?.score || 0) >= 6;
+  }).length || 0;
+  const skippedCount = interview.questions?.filter((q) => {
+    const a = answerMap[q.id];
+    return isMCQ ? !a?.selected_option : (!a?.text_answer || a.text_answer.trim() === "");
+  }).length || 0;
+  const incorrectCount = Math.max(0, totalQuestions - correctCount - skippedCount);
+
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-16">
+      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-16">
         {/* Scorecard Hero Banner */}
         <div className="rounded-3xl p-6 sm:p-8 border border-[#E8DDCA] bg-[#FAF8F4] shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
@@ -163,6 +175,28 @@ function InterviewResultsContent() {
           </div>
         </div>
 
+        {/* Breakdown Summary Chips */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#E8DDCA] text-xs font-medium text-[#252923]">
+            <span className="text-[#777B74]">Total:</span>
+            <span className="font-bold">{totalQuestions} Questions</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDF3EB] border border-[#DCE6D8] text-xs font-semibold text-[#367451]">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>{correctCount} Correct</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-xs font-semibold text-[#B8473F]">
+            <XCircle className="h-3.5 w-3.5" />
+            <span>{incorrectCount} Incorrect</span>
+          </div>
+          {skippedCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FBF5E8] border border-[#E8DDCA] text-xs font-semibold text-[#9A641A]">
+              <AlertCircle className="h-3.5 w-3.5" />
+              <span>{skippedCount} Skipped</span>
+            </div>
+          )}
+        </div>
+
         {/* Quick Actions Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#E8DDCA] shadow-xs">
           <div className="text-xs font-medium text-[#777B74]">
@@ -170,6 +204,14 @@ function InterviewResultsContent() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <Link
+              href={`/interviews/new?role=${encodeURIComponent(interview.job_role)}&difficulty=${encodeURIComponent(interview.difficulty)}&mode=${interview.mode}&count=${interview.num_questions}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#DCE6D8] bg-[#EDF3EB] text-[#24483F] hover:bg-[#DCE6D8] text-xs font-semibold transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Retake Session</span>
+            </Link>
+
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E8DDCA] text-[#252923] hover:bg-[#FAF8F4] text-xs font-semibold transition-colors"
@@ -183,7 +225,7 @@ function InterviewResultsContent() {
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#24483F] hover:bg-[#1A342D] text-[#F7F3EA] text-xs font-semibold shadow-xs transition-colors"
             >
               <PlusCircle className="h-3.5 w-3.5" />
-              <span>Start Another Practice Test</span>
+              <span>Start New Test</span>
             </Link>
           </div>
         </div>
@@ -238,29 +280,44 @@ function InterviewResultsContent() {
                   <div className="space-y-4 pt-1">
                     {/* User's selection and correct status */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
-                        ans?.is_correct 
-                          ? "bg-[#EDF3EB] border-[#DCE6D8] text-[#252923]" 
-                          : "bg-[#FDF1F0] border-[#E8DDCA] text-[#252923]"
-                      }`}>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#879477]">Your Answer</p>
-                          <p className="font-bold text-sm mt-0.5">
-                            Option {ans?.selected_option || "None"}
-                          </p>
+                      {ans?.selected_option ? (
+                        <div className={`p-3.5 rounded-xl border flex items-center justify-between ${
+                          ans.is_correct 
+                            ? "bg-[#EDF3EB] border-[#DCE6D8] text-[#252923]" 
+                            : "bg-[#FDF1F0] border-[#E8DDCA] text-[#252923]"
+                        }`}>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#879477]">Your Answer</p>
+                            <p className="font-bold text-sm mt-0.5">
+                              Option {ans.selected_option}
+                            </p>
+                          </div>
+                          {ans.is_correct ? (
+                            <div className="flex items-center gap-1 text-[#367451] font-bold text-xs">
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Correct</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[#B8473F] font-bold text-xs">
+                              <XCircle className="h-4 w-4" />
+                              <span>Incorrect</span>
+                            </div>
+                          )}
                         </div>
-                        {ans?.is_correct ? (
-                          <div className="flex items-center gap-1 text-[#367451] font-bold text-xs">
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>Correct</span>
+                      ) : (
+                        <div className="p-3.5 rounded-xl border border-[#E8DDCA] bg-[#FAF8F4] text-[#252923] flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#879477]">Your Answer</p>
+                            <p className="font-bold text-sm mt-0.5 text-[#777B74]">
+                              Skipped (Not Attempted)
+                            </p>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-[#B8473F] font-bold text-xs">
-                            <XCircle className="h-4 w-4" />
-                            <span>Incorrect</span>
+                          <div className="flex items-center gap-1 text-[#9A641A] font-bold text-xs">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>Unanswered</span>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       <div className="p-3.5 rounded-xl bg-[#FAF8F4] border border-[#E8DDCA] text-[#252923]">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-[#879477]">Correct Answer</p>
@@ -318,9 +375,16 @@ function InterviewResultsContent() {
                   <div className="space-y-4 pt-1">
                     {/* Candidate's submitted text */}
                     <div>
-                      <span className="text-[11px] font-bold uppercase text-[#879477] tracking-wider">Your Submitted Answer</span>
-                      <div className="mt-1 p-4 rounded-xl bg-[#FAF8F4] border border-[#E8DDCA] text-xs text-[#252923] leading-relaxed whitespace-pre-line font-mono">
-                        {ans?.text_answer || "No response provided."}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-bold uppercase text-[#879477] tracking-wider">Your Submitted Answer</span>
+                        {!ans?.text_answer && (
+                          <span className="text-[10px] font-bold text-[#9A641A] bg-[#FBF5E8] border border-[#E8DDCA] px-2 py-0.5 rounded-full">
+                            Skipped (Not Attempted)
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-4 rounded-xl bg-[#FAF8F4] border border-[#E8DDCA] text-xs text-[#252923] leading-relaxed whitespace-pre-line font-mono">
+                        {ans?.text_answer ? ans.text_answer : "No response provided for this question."}
                       </div>
                     </div>
 
@@ -333,7 +397,7 @@ function InterviewResultsContent() {
                         </span>
                       </div>
                       <p className="text-xs text-[#252923] leading-relaxed font-medium">
-                        {ans?.feedback}
+                        {ans?.feedback || "Question was not attempted."}
                       </p>
 
                       {/* Strengths & Missing Concepts */}

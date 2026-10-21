@@ -11,7 +11,8 @@ import {
   BookOpen, 
   Filter, 
   Loader2, 
-  PlusCircle
+  PlusCircle,
+  Search
 } from "lucide-react";
 
 export default function BookmarksPage() {
@@ -19,6 +20,7 @@ export default function BookmarksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchBookmarks();
@@ -48,8 +50,16 @@ export default function BookmarksPage() {
 
   const availableRoles = Array.from(new Set(bookmarks.map((b) => b.question.role)));
   const filtered = bookmarks.filter((b) => {
-    if (roleFilter === "all") return true;
-    return b.question.role === roleFilter;
+    const matchesRole = roleFilter === "all" || b.question.role === roleFilter;
+    if (!matchesRole) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      b.question.question_text.toLowerCase().includes(q) ||
+      b.question.topic.toLowerCase().includes(q) ||
+      (b.question.explanation && b.question.explanation.toLowerCase().includes(q)) ||
+      (b.question.model_answer && b.question.model_answer.toLowerCase().includes(q))
+    );
   });
 
   return (
@@ -72,36 +82,48 @@ export default function BookmarksPage() {
           </span>
         </div>
 
-        {/* Filters */}
-        {availableRoles.length > 1 && (
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-[#879477]" />
-            <span className="text-xs font-semibold text-[#777B74]">Filter Role:</span>
-            <button
-              onClick={() => setRoleFilter("all")}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                roleFilter === "all"
-                  ? "bg-[#24483F] text-[#F7F3EA] shadow-xs"
-                  : "bg-white text-[#252923] border border-[#E8DDCA] hover:bg-[#FAF8F4]"
-              }`}
-            >
-              All Roles
-            </button>
-            {availableRoles.map((r) => (
+        {/* Search & Filters Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#879477]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search saved questions, topics, concepts..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-[#E8DDCA] bg-white text-xs text-[#252923] placeholder:text-[#879477] focus:outline-none focus:ring-2 focus:ring-[#24483F] focus:border-[#24483F]"
+            />
+          </div>
+
+          {availableRoles.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <Filter className="h-4 w-4 text-[#879477] shrink-0" />
               <button
-                key={r}
-                onClick={() => setRoleFilter(r)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  roleFilter === r
+                onClick={() => setRoleFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  roleFilter === "all"
                     ? "bg-[#24483F] text-[#F7F3EA] shadow-xs"
                     : "bg-white text-[#252923] border border-[#E8DDCA] hover:bg-[#FAF8F4]"
                 }`}
               >
-                {r}
+                All Roles
               </button>
-            ))}
-          </div>
-        )}
+              {availableRoles.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRoleFilter(r)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    roleFilter === r
+                      ? "bg-[#24483F] text-[#F7F3EA] shadow-xs"
+                      : "bg-white text-[#252923] border border-[#E8DDCA] hover:bg-[#FAF8F4]"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-[#777B74]">

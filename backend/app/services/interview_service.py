@@ -38,6 +38,11 @@ SUPPORTED_ROLES = [
     "Cloud Architect",
     "Cybersecurity Analyst",
     "QA Engineer",
+    "Go Developer",
+    "Rust Developer",
+    "Data Engineer",
+    "Site Reliability Engineer",
+    "Systems Engineer",
 ]
 
 SUPPORTED_KEYWORDS = [
@@ -45,7 +50,11 @@ SUPPORTED_KEYWORDS = [
     "data analyst", "machine learning", "deep learning", "database", "dba", "sql",
     "network", "networks", "devops", "cloud", "security", "docker", "kubernetes",
     "cybersecurity", "ai engineer", "mobile", "ios", "android", "software engineer",
-    "data science", "data scientist", "qa", "test automation", "systems engineer"
+    "data science", "data scientist", "qa", "test automation", "systems engineer",
+    "go", "golang", "rust", "c++", "c#", ".net", "dotnet", "swift", "kotlin",
+    "flutter", "react", "angular", "vue", "node", "typescript", "javascript",
+    "data engineer", "sre", "site reliability", "embedded", "blockchain",
+    "developer", "engineer", "architect", "analyst", "administrator", "programmer"
 ]
 
 VALID_DIFFICULTIES = ["Junior", "Mid-Level", "Senior", "Easy", "Medium", "Hard"]
@@ -383,7 +392,28 @@ class InterviewService:
 
         a_stmt = select(Answer).where(Answer.interview_id == interview.id)
         a_res = await db.execute(a_stmt)
-        answers = a_res.scalars().all()
+        answers = list(a_res.scalars().all())
+
+        # Automatically record unattempted answers for any skipped questions
+        answered_q_ids = {a.question_id for a in answers}
+        for q in questions:
+            if q.id not in answered_q_ids:
+                unattempted_ans = Answer(
+                    interview_id=interview.id,
+                    question_id=q.id,
+                    user_id=user.id,
+                    selected_option=None,
+                    text_answer="",
+                    is_correct=False,
+                    score=0.0,
+                    feedback="Question was not attempted during the practice session.",
+                    strengths=json.dumps([]),
+                    missing_concepts=json.dumps(["Question not attempted"]),
+                    improvement_tips=json.dumps(["Review question explanation and sample answer"]),
+                    model_answer=q.model_answer
+                )
+                db.add(unattempted_ans)
+                answers.append(unattempted_ans)
 
         total_score = sum(a.score for a in answers)
         if interview.mode == "mcq":

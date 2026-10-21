@@ -11,7 +11,8 @@ import {
   Send, 
   Loader2, 
   Award,
-  BookOpen
+  BookOpen,
+  Bookmark
 } from "lucide-react";
 
 export default function DailyQuestionPage() {
@@ -22,6 +23,8 @@ export default function DailyQuestionPage() {
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [textAnswer, setTextAnswer] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [savingBookmark, setSavingBookmark] = useState(false);
 
   useEffect(() => {
     fetchDailyQuestion();
@@ -33,6 +36,7 @@ export default function DailyQuestionPage() {
       setError(null);
       const res = await apiRequest<DailyQuestion>("/daily");
       setData(res);
+      setIsBookmarked(Boolean(res.is_bookmarked));
       if (res.user_attempt) {
         if (res.question_type === "mcq") {
           setSelectedOption(res.user_attempt.submitted_answer);
@@ -44,6 +48,24 @@ export default function DailyQuestionPage() {
       setError(err.message || "Failed to load today's question.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    if (!data?.question_id) return;
+    setSavingBookmark(true);
+    try {
+      if (isBookmarked) {
+        await apiRequest(`/bookmarks/${data.question_id}`, { method: "DELETE" });
+        setIsBookmarked(false);
+      } else {
+        await apiRequest(`/bookmarks/${data.question_id}`, { method: "POST" });
+        setIsBookmarked(true);
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to toggle bookmark.");
+    } finally {
+      setSavingBookmark(false);
     }
   };
 
@@ -116,12 +138,31 @@ export default function DailyQuestionPage() {
                 </span>
               </div>
 
-              {data.has_attempted && (
-                <span className="text-xs font-bold text-[#367451] bg-[#EDF3EB] border border-[#DCE6D8] px-2.5 py-1 rounded-full flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Completed Today
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {data.question_id && (
+                  <button
+                    type="button"
+                    onClick={handleToggleBookmark}
+                    disabled={savingBookmark}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      isBookmarked
+                        ? "bg-[#F7ECE7] text-[#C66A4A] border border-[#E8DDCA]"
+                        : "bg-[#FAF8F4] text-[#252923] hover:bg-[#EDF3EB] border border-[#E8DDCA]"
+                    }`}
+                    title="Bookmark today's question for revision"
+                  >
+                    <Bookmark className={`h-3.5 w-3.5 ${isBookmarked ? "fill-[#C66A4A] text-[#C66A4A]" : "text-[#879477]"}`} />
+                    <span>{savingBookmark ? "Saving..." : isBookmarked ? "Saved" : "Save Question"}</span>
+                  </button>
+                )}
+
+                {data.has_attempted && (
+                  <span className="text-xs font-bold text-[#367451] bg-[#EDF3EB] border border-[#DCE6D8] px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Completed Today
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Question Statement */}

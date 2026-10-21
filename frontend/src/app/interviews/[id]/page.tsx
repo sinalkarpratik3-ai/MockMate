@@ -15,7 +15,8 @@ import {
   Award, 
   BookOpen, 
   Check, 
-  CheckSquare
+  CheckSquare,
+  Bookmark
 } from "lucide-react";
 
 function InterviewWorkspaceContent() {
@@ -39,9 +40,46 @@ function InterviewWorkspaceContent() {
   const [evaluatingQuestion, setEvaluatingQuestion] = useState(false);
   const [evaluatedAnswers, setEvaluatedAnswers] = useState<Record<number, Answer>>({});
 
+  // Bookmarks state
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  const [savingBookmarkId, setSavingBookmarkId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchInterview();
+    fetchUserBookmarks();
   }, [interviewId]);
+
+  const fetchUserBookmarks = async () => {
+    try {
+      const bms = await apiRequest<any[]>("/bookmarks");
+      const ids = new Set<number>(bms.map((b) => b.question_id));
+      setBookmarkedIds(ids);
+    } catch (err) {
+      console.warn("Could not fetch user bookmarks:", err);
+    }
+  };
+
+  const handleToggleBookmark = async (questionId: number) => {
+    setSavingBookmarkId(questionId);
+    const isBookmarked = bookmarkedIds.has(questionId);
+    try {
+      if (isBookmarked) {
+        await apiRequest(`/bookmarks/${questionId}`, { method: "DELETE" });
+        setBookmarkedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(questionId);
+          return next;
+        });
+      } else {
+        await apiRequest(`/bookmarks/${questionId}`, { method: "POST" });
+        setBookmarkedIds((prev) => new Set(prev).add(questionId));
+      }
+    } catch (err: any) {
+      alert(err.message || "Bookmark action failed.");
+    } finally {
+      setSavingBookmarkId(null);
+    }
+  };
 
   const fetchInterview = async () => {
     try {
@@ -151,6 +189,24 @@ function InterviewWorkspaceContent() {
           body: JSON.stringify({ answers: batch }),
         });
       } else {
+        // In text mode, automatically submit any typed answers that haven't been submitted yet
+        const unsubmitted = Object.entries(textAnswers).filter(
+          ([qId, txt]) => txt && txt.trim() && !evaluatedAnswers[parseInt(qId)]
+        );
+        for (const [qId, txt] of unsubmitted) {
+          try {
+            await apiRequest(`/interviews/${interviewId}/submit-answer`, {
+              method: "POST",
+              body: JSON.stringify({
+                question_id: parseInt(qId),
+                text_answer: txt,
+              }),
+            });
+          } catch (e) {
+            console.warn("Auto-submit pending text answer warning:", e);
+          }
+        }
+
         await apiRequest(`/interviews/${interviewId}/complete`, {
           method: "POST",
         });
@@ -261,6 +317,7 @@ function InterviewWorkspaceContent() {
             const isAnswered = isMCQ 
               ? selectedOptions[q.id] !== undefined 
               : evaluatedAnswers[q.id] !== undefined;
+            const hasDraftText = !isMCQ && !isAnswered && (textAnswers[q.id] || "").trim().length > 0;
             const isCurrent = idx === currentIndex;
 
             return (
@@ -272,11 +329,14 @@ function InterviewWorkspaceContent() {
                     ? "bg-[#24483F] text-[#F7F3EA] shadow-xs"
                     : isAnswered
                     ? "bg-[#EDF3EB] text-[#24483F] border border-[#DCE6D8]"
+                    : hasDraftText
+                    ? "bg-[#FBF5E8] text-[#9A641A] border border-[#E8DDCA]"
                     : "bg-white text-[#777B74] border border-[#E8DDCA] hover:bg-[#FAF8F4]"
                 }`}
               >
                 <span>{idx + 1}</span>
                 {isAnswered && !isCurrent && <Check className="h-3 w-3 text-[#367451]" />}
+                {hasDraftText && !isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#9A641A]" />}
               </button>
             );
           })}
@@ -284,7 +344,7 @@ function InterviewWorkspaceContent() {
 
         {/* Main Question Card */}
         <div className="bg-white rounded-2xl border border-[#E8DDCA] p-6 sm:p-8 shadow-xs space-y-6">
-          {/* Question Metadata */}
+          {/* Question Metadata & Actions */}
           <div className="flex flex-wrap items-center justify-between text-xs text-[#879477] border-b border-[#E8DDCA] pb-3 gap-2">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-[#24483F]">Topic: {currentQuestion.topic}</span>
@@ -293,7 +353,23 @@ function InterviewWorkspaceContent() {
                 Round #{currentQuestion.round_number || currentIndex + 1} ({currentQuestion.difficulty || "Easy"})
               </span>
             </div>
-            <span>Question #{currentIndex + 1} of {totalQuestions}</span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleToggleBookmark(currentQuestion.id)}
+                disabled={savingBookmarkId === currentQuestion.id}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  bookmarkedIds.has(currentQuestion.id)
+                    ? "bg-[#F7ECE7] text-[#C66A4A] border border-[#E8DDCA]"
+                    : "bg-[#FAF8F4] text-[#252923] hover:bg-[#EDF3EB] border border-[#E8DDCA]"
+                }`}
+                title="Save question for revision"
+              >
+                <Bookmark className={`h-3.5 w-3.5 ${bookmarkedIds.has(currentQuestion.id) ? "fill-[#C66A4A] text-[#C66A4A]" : "text-[#879477]"}`} />
+                <span>{bookmarkedIds.has(currentQuestion.id) ? "Saved" : "Save Question"}</span>
+              </button>
+              <span>Question #{currentIndex + 1} of {totalQuestions}</span>
+            </div>
           </div>
 
           {/* Question Statement */}
@@ -500,6 +576,15 @@ function InterviewWorkspaceContent() {
                 You have answered <strong>{answeredCount} of {totalQuestions}</strong> questions.
                 Once submitted, your final scorecard and topic performance will be recorded.
               </p>
+
+              {totalQuestions - answeredCount > 0 && (
+                <div className="p-3 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-[#B8473F] text-xs flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>
+                    You have <strong>{totalQuestions - answeredCount} unanswered question(s)</strong>. Unanswered questions will be recorded as not attempted.
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-3">
                 <button

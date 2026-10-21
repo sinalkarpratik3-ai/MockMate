@@ -118,6 +118,7 @@ export interface BookmarkItem {
 
 export interface DailyQuestion {
   id: number;
+  question_id?: number;
   date: string;
   question_text: string;
   role: string;
@@ -126,6 +127,7 @@ export interface DailyQuestion {
   question_type: "mcq" | "text";
   options?: MCQOption[] | null;
   has_attempted: boolean;
+  is_bookmarked?: boolean;
   user_attempt?: {
     id: number;
     submitted_answer: string;

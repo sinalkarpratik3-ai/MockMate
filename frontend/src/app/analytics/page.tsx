@@ -102,12 +102,16 @@ export default function AnalyticsPage() {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-end gap-2 h-40 pt-4 border-b border-[#E8DDCA]">
                     {data.performance_trends.map((pt, idx) => (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
+                        <div className="absolute -top-12 z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-[#252923] text-white text-[10px] px-2.5 py-1 rounded-lg shadow-md whitespace-nowrap text-center border border-[#3D443A]">
+                          <p className="font-bold">{pt.score_percentage}% • {pt.role}</p>
+                          <p className="text-[9px] text-[#DCE6D8]">{pt.date} ({pt.mode === "mcq" ? "Multiple Choice" : "Written"})</p>
+                        </div>
                         <span className="text-[10px] font-bold text-[#252923] opacity-0 group-hover:opacity-100 transition-opacity">
                           {pt.score_percentage}%
                         </span>
                         <div 
-                          className="w-full max-w-[36px] bg-[#24483F] rounded-t-lg transition-all duration-300 group-hover:bg-[#1A342D]" 
+                          className="w-full max-w-[36px] bg-[#24483F] rounded-t-lg transition-all duration-300 group-hover:bg-[#1A342D] cursor-pointer" 
                           style={{ height: `${Math.max(pt.score_percentage, 5)}%` }}
                         />
                       </div>

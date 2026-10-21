@@ -1350,10 +1350,16 @@ def get_fallback_bank_for_role(role: str, mode: str) -> Dict[str, List[Dict[str,
         return bank_source.get("Computer Networks", bank_source.get("Backend Developer", {}))
     if "devops" in clean_role or "cloud" in clean_role or "sre" in clean_role:
         return bank_source.get("DevOps Engineer", bank_source.get("Backend Developer", {}))
+    if "security" in clean_role or "cyber" in clean_role:
+        return bank_source.get("Computer Networks", bank_source.get("DevOps Engineer", {}))
+    if "full" in clean_role or "fullstack" in clean_role:
+        return bank_source.get("Backend Developer", bank_source.get("Frontend Developer", {}))
     if "java" in clean_role:
         return bank_source.get("Java Developer", bank_source.get("Backend Developer", {}))
     if "python" in clean_role:
         return bank_source.get("Python Developer", bank_source.get("Backend Developer", {}))
+    if "go" in clean_role or "golang" in clean_role or "rust" in clean_role:
+        return bank_source.get("Backend Developer", list(bank_source.values())[0])
 
     # 3. Default to Backend Developer if any other software engineering role
     return bank_source.get("Backend Developer", list(bank_source.values())[0])
