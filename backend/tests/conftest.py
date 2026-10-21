@@ -1,10 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 import sys
 import os
+import asyncio
 
 # Add app to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -12,41 +12,47 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from app.main import app
 from app.core.database import Base, get_db
 
-# Use in-memory SQLite database for isolated fast testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
+# Use in-memory SQLite database for isolated fast testing with async driver
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-engine = create_engine(
+test_engine = create_async_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+TestingAsyncSessionLocal = async_sessionmaker(
+    bind=test_engine,
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+)
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    Base.metadata.create_all(bind=engine)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    async def init_models():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    loop.run_until_complete(init_models())
     yield
-    Base.metadata.drop_all(bind=engine)
+    async def drop_models():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await test_engine.dispose()
+    loop.run_until_complete(drop_models())
+    loop.close()
 
 @pytest.fixture
-def db_session():
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    
-    yield session
-    
-    session.close()
-    transaction.rollback()
-    connection.close()
-
-@pytest.fixture
-def client(db_session):
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
+def client():
+    async def override_get_db():
+        async with TestingAsyncSessionLocal() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:

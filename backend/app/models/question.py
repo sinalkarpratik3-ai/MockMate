@@ -10,6 +10,7 @@ class Question(Base):
     interview_id = Column(Integer, ForeignKey("interviews.id", ondelete="CASCADE"), nullable=True, index=True)
     question_text = Column(Text, nullable=False)
     role = Column(String(100), nullable=False)
+    round_number = Column(Integer, nullable=False, default=1)
     difficulty = Column(String(50), nullable=False)
     topic = Column(String(100), nullable=False, index=True)
     question_type = Column(String(20), nullable=False)  # "mcq" or "text"

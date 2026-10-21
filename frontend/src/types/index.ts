@@ -21,6 +21,7 @@ export interface Question {
   interview_id?: number | null;
   question_text: string;
   role: string;
+  round_number?: number | null;
   difficulty: string;
   topic: string;
   question_type: "mcq" | "text";
@@ -52,6 +53,8 @@ export interface Interview {
   user_id: number;
   job_role: string;
   difficulty: string;
+  current_round?: number | null;
+  current_difficulty?: string | null;
   mode: "mcq" | "text";
   num_questions: number;
   status: "in_progress" | "completed";

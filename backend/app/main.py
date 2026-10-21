@@ -8,9 +8,22 @@ from app.api import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure database tables exist
-    Base.metadata.create_all(bind=engine)
+    # Ensure database tables exist asynchronously on startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        from sqlalchemy import text
+        for sql in [
+            "ALTER TABLE interviews ADD COLUMN current_round INTEGER DEFAULT 1",
+            "ALTER TABLE interviews ADD COLUMN current_difficulty VARCHAR(50) DEFAULT 'Easy'",
+            "ALTER TABLE questions ADD COLUMN round_number INTEGER DEFAULT 1",
+        ]:
+            try:
+                await conn.execute(text(sql))
+            except Exception:
+                pass  # Column already exists
     yield
+    # Graceful connection pool disposal on shutdown
+    await engine.dispose()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

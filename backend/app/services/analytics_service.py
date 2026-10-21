@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, date
 from typing import List, Dict, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from app.models.interview import Interview
 from app.models.question import Question
 from app.models.answer import Answer
@@ -10,42 +10,50 @@ from app.models.user import User
 
 class AnalyticsService:
     @staticmethod
-    def get_dashboard_summary(db: Session, user: User) -> Dict[str, Any]:
-        # Completed interviews
-        interviews_query = db.query(Interview).filter(
-            Interview.user_id == user.id,
-            Interview.status == "completed"
-        ).order_by(Interview.completed_at.desc())
-        
-        completed_interviews = interviews_query.all()
+    async def get_dashboard_summary(db: AsyncSession, user: User) -> Dict[str, Any]:
+        # 1. Completed interviews
+        itv_stmt = (
+            select(Interview)
+            .where(Interview.user_id == user.id, Interview.status == "completed")
+            .order_by(Interview.completed_at.desc())
+        )
+        itv_res = await db.execute(itv_stmt)
+        completed_interviews = itv_res.scalars().all()
         total_interviews = len(completed_interviews)
 
-        # Questions attempted
-        answers_query = db.query(Answer).filter(Answer.user_id == user.id)
-        total_questions_attempted = answers_query.count()
+        # 2. Total questions attempted
+        count_stmt = select(func.count(Answer.id)).where(Answer.user_id == user.id)
+        count_res = await db.execute(count_stmt)
+        total_questions_attempted = count_res.scalar() or 0
 
-        # MCQ accuracy
-        mcq_answers = db.query(Answer).join(Interview).filter(
-            Answer.user_id == user.id,
-            Interview.mode == "mcq"
-        ).all()
+        # 3. MCQ accuracy
+        mcq_stmt = (
+            select(Answer)
+            .join(Interview, Answer.interview_id == Interview.id)
+            .where(Answer.user_id == user.id, Interview.mode == "mcq")
+        )
+        mcq_res = await db.execute(mcq_stmt)
+        mcq_answers = mcq_res.scalars().all()
         if mcq_answers:
             correct_mcqs = sum(1 for a in mcq_answers if a.is_correct is True)
             mcq_accuracy_pct = round((correct_mcqs / len(mcq_answers)) * 100.0, 1)
         else:
             mcq_accuracy_pct = 0.0
 
-        # Average text score (out of 10)
-        text_answers = db.query(Answer).join(Interview).filter(
-            Answer.user_id == user.id,
-            Interview.mode == "text"
-        ).all()
+        # 4. Average text score (out of 10)
+        text_stmt = (
+            select(Answer)
+            .join(Interview, Answer.interview_id == Interview.id)
+            .where(Answer.user_id == user.id, Interview.mode == "text")
+        )
+        text_res = await db.execute(text_stmt)
+        text_answers = text_res.scalars().all()
         if text_answers:
             avg_text_score = round(sum(a.score for a in text_answers) / len(text_answers), 1)
         else:
             avg_text_score = 0.0
 
-        # Recent 5 interviews
+        # 5. Recent 5 interviews
         recent_interviews = [
             {
                 "id": itv.id,
@@ -64,10 +72,10 @@ class AnalyticsService:
             for itv in completed_interviews[:5]
         ]
 
-        # Weak topics identification
-        weak_topics = AnalyticsService.get_weak_topics(db, user)
+        # 6. Weak topics identification
+        weak_topics = await AnalyticsService.get_weak_topics(db, user)
 
-        # Role breakdown
+        # 7. Role breakdown
         role_map: Dict[str, List[float]] = {}
         for itv in completed_interviews:
             role_map.setdefault(itv.job_role, []).append(itv.percentage)
@@ -80,7 +88,7 @@ class AnalyticsService:
             for r, scores in role_map.items()
         ]
 
-        # Difficulty breakdown
+        # 8. Difficulty breakdown
         diff_map: Dict[str, List[float]] = {}
         for itv in completed_interviews:
             diff_map.setdefault(itv.difficulty, []).append(itv.percentage)
@@ -93,7 +101,7 @@ class AnalyticsService:
             for d, scores in diff_map.items()
         ]
 
-        # Performance trends (chronological)
+        # 9. Performance trends (chronological)
         performance_trends = [
             {
                 "date": itv.completed_at.strftime("%Y-%m-%d %H:%M") if itv.completed_at else itv.created_at.strftime("%Y-%m-%d"),
@@ -104,16 +112,19 @@ class AnalyticsService:
             for itv in reversed(completed_interviews[:10])
         ]
 
-        # Daily question status
+        # 10. Daily question status
         today = date.today()
-        today_q = db.query(DailyQuestion).filter(DailyQuestion.date == today).first()
+        dq_stmt = select(DailyQuestion).where(DailyQuestion.date == today)
+        dq_res = await db.execute(dq_stmt)
+        today_q = dq_res.scalar_one_or_none()
         has_attempted_daily = False
         if today_q:
-            attempt = db.query(DailyAttempt).filter(
+            att_stmt = select(DailyAttempt).where(
                 DailyAttempt.user_id == user.id,
                 DailyAttempt.daily_question_id == today_q.id
-            ).first()
-            has_attempted_daily = bool(attempt)
+            )
+            att_res = await db.execute(att_stmt)
+            has_attempted_daily = bool(att_res.scalar_one_or_none())
 
         return {
             "total_interviews": total_interviews,
@@ -129,14 +140,14 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_weak_topics(db: Session, user: User) -> List[Dict[str, Any]]:
-        # Query answers grouped by question.topic and question.role
-        answers_with_q = (
-            db.query(Answer, Question)
+    async def get_weak_topics(db: AsyncSession, user: User) -> List[Dict[str, Any]]:
+        stmt = (
+            select(Answer, Question)
             .join(Question, Answer.question_id == Question.id)
-            .filter(Answer.user_id == user.id)
-            .all()
+            .where(Answer.user_id == user.id)
         )
+        res = await db.execute(stmt)
+        answers_with_q = res.all()
 
         topic_stats: Dict[str, Dict[str, Any]] = {}
 

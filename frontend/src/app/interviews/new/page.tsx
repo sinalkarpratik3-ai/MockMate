@@ -21,12 +21,17 @@ import {
 } from "lucide-react";
 
 const ROLES = [
-  { id: "Frontend Developer", name: "Frontend Developer", icon: Code2, desc: "React, Next.js, DOM, CSS architecture, Core Web Vitals" },
-  { id: "Backend Developer", name: "Backend Developer", icon: Server, desc: "REST APIs, database indexing, caching, microservices, auth" },
-  { id: "Python Developer", name: "Python Developer", icon: Terminal, desc: "GIL, asyncio, decorators, memory management, generators" },
-  { id: "Java Developer", name: "Java Developer", icon: Cpu, desc: "JVM memory, Spring Boot, GC, thread pools, Hibernate" },
-  { id: "DevOps Engineer", name: "DevOps Engineer", icon: Layers, desc: "Docker, Kubernetes, CI/CD, Terraform, Linux networking" },
-  { id: "Data Analyst", name: "Data Analyst", icon: Database, desc: "SQL window functions, pandas, data cleaning, stats" },
+  { id: "Python Developer", name: "Python Developer", icon: Terminal, desc: "Python fundamentals, data structures, functions, OOP, exception handling, asyncio" },
+  { id: "Java Developer", name: "Java Developer", icon: Cpu, desc: "Java syntax, OOP, collections, exception handling, JVM, and multithreading" },
+  { id: "Web Developer", name: "Web Developer", icon: Code2, desc: "HTML5, CSS3, JavaScript, HTTP/REST, responsive design, browser APIs, security" },
+  { id: "Frontend Developer", name: "Frontend Developer", icon: Code2, desc: "React, Next.js, DOM, CSS architecture, Core Web Vitals, state management" },
+  { id: "Backend Developer", name: "Backend Developer", icon: Server, desc: "REST APIs, database indexing, caching, microservices, auth, concurrency" },
+  { id: "Data Analyst", name: "Data Analyst", icon: Database, desc: "SQL queries, Excel, data cleaning, statistics, visualization, analytical problem-solving" },
+  { id: "Machine Learning Engineer", name: "Machine Learning Engineer", icon: Cpu, desc: "ML algorithms, feature engineering, model evaluation, overfitting, deep learning" },
+  { id: "Database Administrator", name: "Database Administrator", icon: Database, desc: "SQL, normalization, indexing, transactions, ACID, query optimization, security" },
+  { id: "Computer Networks", name: "Computer Networks", icon: Layers, desc: "OSI and TCP/IP models, routing, switching, DNS, TCP/UDP, network troubleshooting" },
+  { id: "DevOps Engineer", name: "DevOps Engineer", icon: Layers, desc: "Docker, Kubernetes, CI/CD pipelines, Terraform, Linux networking, observability" },
+  { id: "Custom", name: "Custom Domain / Role", icon: Target, desc: "Specify any custom domain, framework, or specialized job role" },
 ];
 
 const DIFFICULTIES = [
@@ -38,22 +43,31 @@ const DIFFICULTIES = [
 export default function NewInterviewPage() {
   const router = useRouter();
 
-  const [selectedRole, setSelectedRole] = useState("Frontend Developer");
-  const [selectedDifficulty, setSelectedDifficulty] = useState("Mid-Level");
+  const [selectedRoleId, setSelectedRoleId] = useState("Python Developer");
+  const [customRoleText, setCustomRoleText] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("Junior");
   const [selectedMode, setSelectedMode] = useState<"mcq" | "text">("mcq");
   const [questionCount, setQuestionCount] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const effectiveRole = selectedRoleId === "Custom" ? customRoleText.trim() : selectedRoleId;
+
   const handleStart = async () => {
     setError(null);
+
+    if (selectedRoleId === "Custom" && !customRoleText.trim()) {
+      setError("Please enter your custom domain or job role.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const interview = await apiRequest<Interview>("/interviews/create", {
         method: "POST",
         body: JSON.stringify({
-          job_role: selectedRole,
+          job_role: effectiveRole,
           difficulty: selectedDifficulty,
           mode: selectedMode,
           num_questions: questionCount,
@@ -93,17 +107,17 @@ export default function NewInterviewPage() {
         {/* Step 1: Select Role */}
         <div className="space-y-3">
           <label className="block text-xs font-bold uppercase tracking-wider text-[#879477]">
-            Step 1: Target Role
+            Step 1: Target Role / Domain
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {ROLES.map((role) => {
               const Icon = role.icon;
-              const isSelected = selectedRole === role.id;
+              const isSelected = selectedRoleId === role.id;
               return (
                 <button
                   key={role.id}
                   type="button"
-                  onClick={() => setSelectedRole(role.id)}
+                  onClick={() => setSelectedRoleId(role.id)}
                   className={`p-4 rounded-xl text-left border transition-all flex flex-col justify-between ${
                     isSelected
                       ? "border-[#24483F] bg-[#EDF3EB] shadow-xs ring-1 ring-[#24483F]"
@@ -126,6 +140,24 @@ export default function NewInterviewPage() {
               );
             })}
           </div>
+
+          {selectedRoleId === "Custom" && (
+            <div className="mt-3 p-4 rounded-xl bg-[#FAF8F4] border border-[#E8DDCA] space-y-2 animate-in fade-in duration-150">
+              <label className="block text-xs font-bold text-[#252923]">
+                Enter Custom Domain or Job Role
+              </label>
+              <input
+                type="text"
+                value={customRoleText}
+                onChange={(e) => setCustomRoleText(e.target.value)}
+                placeholder="e.g. Cybersecurity Analyst, Cloud Architect, Go Developer, Systems Engineer..."
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#E8DDCA] text-xs text-[#252923] bg-white focus:outline-none focus:ring-2 focus:ring-[#24483F] focus:border-[#24483F]"
+              />
+              <p className="text-[11px] text-[#777B74]">
+                Questions will be dynamically generated and structured for this target role.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Step 2: Select Difficulty */}
@@ -264,7 +296,7 @@ export default function NewInterviewPage() {
           <div>
             <span className="text-[11px] font-bold uppercase text-[#879477]">Session Summary</span>
             <p className="text-sm font-bold text-[#252923] mt-0.5">
-              {selectedDifficulty} {selectedRole} • {selectedMode === "mcq" ? "Multiple Choice" : "Written"} ({questionCount} Questions)
+              {selectedDifficulty} {effectiveRole || "Custom Role"} • {selectedMode === "mcq" ? "Multiple Choice" : "Written"} ({questionCount} Questions)
             </p>
           </div>
 

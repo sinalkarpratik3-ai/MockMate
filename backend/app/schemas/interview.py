@@ -18,6 +18,8 @@ class InterviewOut(BaseModel):
     difficulty: str
     mode: str
     num_questions: int
+    current_round: Optional[int] = 1
+    current_difficulty: Optional[str] = "Easy"
     status: str
     total_score: float
     max_score: float

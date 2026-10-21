@@ -118,6 +118,14 @@ function InterviewWorkspaceContent() {
         ...prev,
         [currentQuestion.id]: res,
       }));
+
+      // Refresh interview to update round progression and adaptive difficulty
+      try {
+        const updated = await apiRequest<Interview>(`/interviews/${interviewId}`);
+        setInterview(updated);
+      } catch {
+        // Fallback silently if background refresh fails
+      }
     } catch (err: any) {
       alert(err.message || "Review failed. Please try again.");
     } finally {
@@ -197,12 +205,21 @@ function InterviewWorkspaceContent() {
         {/* Top Header Bar */}
         <div className="bg-white rounded-2xl border border-[#E8DDCA] p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDF3EB] text-[#24483F] border border-[#DCE6D8]">
                 {interview.job_role}
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF8F4] text-[#252923] border border-[#E8DDCA]">
-                {interview.difficulty}
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#24483F] text-[#F7F3EA]">
+                Round {currentQuestion.round_number || (currentIndex + 1)}
+              </span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                (currentQuestion.difficulty || interview.current_difficulty || "").toLowerCase().includes("hard")
+                  ? "bg-[#FDF1F0] text-[#B8473F] border-[#E8DDCA]"
+                  : (currentQuestion.difficulty || interview.current_difficulty || "").toLowerCase().includes("medium")
+                  ? "bg-[#FBF5E8] text-[#9A641A] border-[#E8DDCA]"
+                  : "bg-[#EDF3EB] text-[#367451] border-[#DCE6D8]"
+              }`}>
+                {currentQuestion.difficulty || interview.current_difficulty || "Easy"}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF8F4] text-[#879477] border border-[#E8DDCA]">
                 {isMCQ ? "Multiple Choice" : "Written Answers"}
@@ -268,9 +285,15 @@ function InterviewWorkspaceContent() {
         {/* Main Question Card */}
         <div className="bg-white rounded-2xl border border-[#E8DDCA] p-6 sm:p-8 shadow-xs space-y-6">
           {/* Question Metadata */}
-          <div className="flex items-center justify-between text-xs text-[#879477] border-b border-[#E8DDCA] pb-3">
-            <span className="font-semibold text-[#24483F]">Topic: {currentQuestion.topic}</span>
-            <span>Question #{currentIndex + 1}</span>
+          <div className="flex flex-wrap items-center justify-between text-xs text-[#879477] border-b border-[#E8DDCA] pb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-[#24483F]">Topic: {currentQuestion.topic}</span>
+              <span className="text-[#DCE6D8]">•</span>
+              <span className="font-medium text-[#777B74]">
+                Round #{currentQuestion.round_number || currentIndex + 1} ({currentQuestion.difficulty || "Easy"})
+              </span>
+            </div>
+            <span>Question #{currentIndex + 1} of {totalQuestions}</span>
           </div>
 
           {/* Question Statement */}

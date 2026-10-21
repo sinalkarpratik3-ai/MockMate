@@ -12,6 +12,7 @@ class QuestionOut(BaseModel):
     interview_id: Optional[int] = None
     question_text: str
     role: str
+    round_number: Optional[int] = 1
     difficulty: str
     topic: str
     question_type: str  # "mcq" or "text"

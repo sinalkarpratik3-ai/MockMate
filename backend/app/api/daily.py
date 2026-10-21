@@ -2,21 +2,23 @@ import json
 from datetime import date, datetime, timezone
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
 from app.models.user import User
 from app.models.daily import DailyQuestion, DailyAttempt
-from app.schemas.daily import DailyQuestionOut, DailyAttemptSubmit, DailyAttemptOut
+from app.schemas.daily import DailyAttemptSubmit
 from app.services.auth_service import get_current_user
 from app.services.interview_service import InterviewService
 from app.services.ai_service import ai_service, FALLBACK_MCQ_BANK
-from app.services.evaluation_service import evaluation_service
 
 router = APIRouter(prefix="/daily", tags=["Question of the Day"])
 
-def _ensure_daily_question(db: Session) -> DailyQuestion:
+async def _ensure_daily_question(db: AsyncSession) -> DailyQuestion:
     today = date.today()
-    existing = db.query(DailyQuestion).filter(DailyQuestion.date == today).first()
+    stmt = select(DailyQuestion).where(DailyQuestion.date == today)
+    res = await db.execute(stmt)
+    existing = res.scalar_one_or_none()
     if existing:
         return existing
 
@@ -24,8 +26,14 @@ def _ensure_daily_question(db: Session) -> DailyQuestion:
     roles = ["Frontend Developer", "Backend Developer", "Python Developer", "DevOps Engineer"]
     day_num = today.toordinal()
     selected_role = roles[day_num % len(roles)]
-    bank = FALLBACK_MCQ_BANK.get(selected_role, FALLBACK_MCQ_BANK["Backend Developer"])
-    q_data = bank[day_num % len(bank)]
+    diff_map = FALLBACK_MCQ_BANK.get(selected_role, FALLBACK_MCQ_BANK.get("Backend Developer", {}))
+    role_questions = []
+    for q_list in diff_map.values():
+        if isinstance(q_list, list):
+            role_questions.extend(q_list)
+    if not role_questions:
+        role_questions = [list(diff_map.values())[0][0]]
+    q_data = role_questions[day_num % len(role_questions)]
 
     new_daily = DailyQuestion(
         date=today,
@@ -40,20 +48,22 @@ def _ensure_daily_question(db: Session) -> DailyQuestion:
         model_answer=None
     )
     db.add(new_daily)
-    db.commit()
-    db.refresh(new_daily)
+    await db.commit()
+    await db.refresh(new_daily)
     return new_daily
 
 @router.get("", response_model=Dict[str, Any])
-def get_daily_question(
+async def get_daily_question(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    daily_q = _ensure_daily_question(db)
-    attempt = db.query(DailyAttempt).filter(
+    daily_q = await _ensure_daily_question(db)
+    att_stmt = select(DailyAttempt).where(
         DailyAttempt.user_id == current_user.id,
         DailyAttempt.daily_question_id == daily_q.id
-    ).first()
+    )
+    att_res = await db.execute(att_stmt)
+    attempt = att_res.scalar_one_or_none()
 
     opts = InterviewService._parse_options(daily_q.options) if daily_q.options else None
 
@@ -89,13 +99,15 @@ def get_daily_question(
 async def submit_daily_attempt(
     attempt_in: DailyAttemptSubmit,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
-    daily_q = _ensure_daily_question(db)
-    existing = db.query(DailyAttempt).filter(
+    daily_q = await _ensure_daily_question(db)
+    att_stmt = select(DailyAttempt).where(
         DailyAttempt.user_id == current_user.id,
         DailyAttempt.daily_question_id == daily_q.id
-    ).first()
+    )
+    att_res = await db.execute(att_stmt)
+    existing = att_res.scalar_one_or_none()
 
     if existing:
         raise HTTPException(
@@ -129,8 +141,8 @@ async def submit_daily_attempt(
         feedback=feedback
     )
     db.add(attempt)
-    db.commit()
-    db.refresh(attempt)
+    await db.commit()
+    await db.refresh(attempt)
 
     return {
         "id": attempt.id,

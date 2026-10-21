@@ -3,239 +3,21 @@ import logging
 import random
 from typing import List, Dict, Any, Optional
 import httpx
+
 from app.core.config import settings
+from app.services.question_banks import (
+    ROLE_TOPICS,
+    FALLBACK_MCQ_BANK,
+    FALLBACK_TEXT_BANK,
+    get_topics_for_role,
+    get_fallback_bank_for_role,
+    normalize_question_text,
+    is_duplicate_or_near_duplicate,
+    get_round_difficulty,
+    adapt_difficulty,
+)
 
 logger = logging.getLogger(__name__)
-
-# Curated high-caliber technical questions for resilient fallback across roles & difficulties
-ROLE_TOPICS = {
-    "Frontend Developer": [
-        "DOM & Event Loop", "React Hooks & Lifecycle", "State Management & Redux",
-        "CSS Layouts & Flexbox/Grid", "Web Performance & Core Web Vitals", "TypeScript & Type Safety"
-    ],
-    "Backend Developer": [
-        "REST API Design & Idempotency", "Database Indexing & Query Optimization", "Authentication & JWT Security",
-        "Caching Strategies & Redis", "Concurrency & Race Conditions", "Microservices vs Monolith"
-    ],
-    "Python Developer": [
-        "Decorators & Generators", "GIL & Multithreading vs Multiprocessing", "Memory Management & Reference Counting",
-        "Asyncio & Coroutines", "Data Structures & Time Complexity", "Metaclasses & Dunder Methods"
-    ],
-    "Java Developer": [
-        "JVM Memory Architecture & GC", "Spring Boot & Dependency Injection", "Java Concurrency & Thread Pools",
-        "Generics & Type Erasure", "Hibernate & N+1 Problem", "Stream API & Functional Interfaces"
-    ],
-    "DevOps Engineer": [
-        "CI/CD Pipelines & GitHub Actions", "Docker & Container Optimization", "Kubernetes Pods & Services",
-        "Infrastructure as Code & Terraform", "Monitoring & Prometheus/Grafana", "Linux Networking & Security"
-    ],
-    "Data Analyst": [
-        "SQL Window Functions & Aggregations", "Data Cleaning & Handling Missing Values", "Pandas DataFrames & Vectorization",
-        "Statistical Testing & P-Values", "Data Visualization & Chart Selection", "ETL Pipelines & Data Modeling"
-    ]
-}
-
-FALLBACK_MCQ_BANK = {
-    "Frontend Developer": [
-        {
-            "question_text": "In React 18+, which hook is specifically designed for deferring non-urgent state updates to keep the UI responsive?",
-            "topic": "React Hooks & Lifecycle",
-            "options": [
-                {"key": "A", "text": "useEffect"},
-                {"key": "B", "text": "useTransition"},
-                {"key": "C", "text": "useImperativeHandle"},
-                {"key": "D", "text": "useLayoutEffect"}
-            ],
-            "correct_option": "B",
-            "explanation": "useTransition lets developers mark state updates as non-urgent transitions, enabling React to yield execution back to urgent user input."
-        },
-        {
-            "question_text": "What is the primary difference between CSS 'grid' and 'flexbox' in modern responsive layouts?",
-            "topic": "CSS Layouts & Flexbox/Grid",
-            "options": [
-                {"key": "A", "text": "Grid is 2-dimensional (rows & columns) while Flexbox is 1-dimensional (row or column)"},
-                {"key": "B", "text": "Flexbox only works in modern Chromium browsers"},
-                {"key": "C", "text": "Grid does not support gap properties"},
-                {"key": "D", "text": "Flexbox cannot wrap elements onto multiple lines"}
-            ],
-            "correct_option": "A",
-            "explanation": "CSS Grid is inherently two-dimensional, allowing layout controls along both rows and columns simultaneously, whereas Flexbox manages items along a single main axis at a time."
-        },
-        {
-            "question_text": "What does Core Web Vital metric LCP (Largest Contentful Paint) specifically measure?",
-            "topic": "Web Performance & Core Web Vitals",
-            "options": [
-                {"key": "A", "text": "Total time taken to download all JavaScript bundles"},
-                {"key": "B", "text": "The time it takes for the largest visual content element in the viewport to render"},
-                {"key": "C", "text": "The responsiveness of the page to the first user click"},
-                {"key": "D", "text": "Unexpected layout shifts during page loading"}
-            ],
-            "correct_option": "B",
-            "explanation": "LCP measures perceived load speed by recording when the main content of the viewport (such as a hero image or large text heading) has finished rendering."
-        }
-    ],
-    "Backend Developer": [
-        {
-            "question_text": "Which HTTP method is required by the HTTP/1.1 specification to be idempotent?",
-            "topic": "REST API Design & Idempotency",
-            "options": [
-                {"key": "A", "text": "POST"},
-                {"key": "B", "text": "PUT"},
-                {"key": "C", "text": "PATCH (when used for appending)"},
-                {"key": "D", "text": "CONNECT"}
-            ],
-            "correct_option": "B",
-            "explanation": "PUT is defined by RFC 7231 as idempotent: performing identical requests multiple times results in the same server resource state."
-        },
-        {
-            "question_text": "In relational databases, what happens when a query performs an 'Index Scan' compared to a 'Sequential Scan'?",
-            "topic": "Database Indexing & Query Optimization",
-            "options": [
-                {"key": "A", "text": "An Index Scan reads the B-Tree index to locate row pointers, avoiding reading the entire table"},
-                {"key": "B", "text": "An Index Scan always locks the entire table during execution"},
-                {"key": "C", "text": "Sequential Scan is always faster for selective WHERE filters"},
-                {"key": "D", "text": "An Index Scan converts relational tables to unindexed text files"}
-            ],
-            "correct_option": "A",
-            "explanation": "An index scan uses the pre-computed tree structure of the index to find matching row IDs in O(log N) time, whereas a sequential scan reads all blocks sequentially."
-        },
-        {
-            "question_text": "What is the primary advantage of storing session state in Redis rather than inside web server process memory?",
-            "topic": "Caching Strategies & Redis",
-            "options": [
-                {"key": "A", "text": "Redis eliminates the need for database migrations completely"},
-                {"key": "B", "text": "It allows stateless web instances to scale horizontally behind a load balancer without sticky sessions"},
-                {"key": "C", "text": "Redis encrypts all passwords automatically without hashing"},
-                {"key": "D", "text": "Process memory cannot hold more than 1 MB of session data"}
-            ],
-            "correct_option": "B",
-            "explanation": "A centralized in-memory store like Redis decouples session state from individual application instances, enabling horizontal autoscaling without session loss."
-        }
-    ],
-    "Python Developer": [
-        {
-            "question_text": "How does the Python Global Interpreter Lock (GIL) affect multithreading in CPython?",
-            "topic": "GIL & Multithreading vs Multiprocessing",
-            "options": [
-                {"key": "A", "text": "It prevents multiple Python bytecode instructions from executing concurrently across CPU cores"},
-                {"key": "B", "text": "It prevents I/O bound operations from yielding execution"},
-                {"key": "C", "text": "It automatically converts recursive functions to tail-recursive calls"},
-                {"key": "D", "text": "It enforces type checking at interpreter startup"}
-            ],
-            "correct_option": "A",
-            "explanation": "The CPython GIL ensures that only one native thread executes Python bytecode at any moment, limiting CPU-bound multithreading unless multiprocessing or GIL-free runtimes are used."
-        },
-        {
-            "question_text": "What is the main behavioral difference between a standard Python function and a generator function containing 'yield'?",
-            "topic": "Decorators & Generators",
-            "options": [
-                {"key": "A", "text": "Generators execute synchronously and return a populated list immediately"},
-                {"key": "B", "text": "Generators return an iterator that pauses execution and preserves local state between calls"},
-                {"key": "C", "text": "Generators can only yield integer values"},
-                {"key": "D", "text": "Generators bypass Python memory management and garbage collection"}
-            ],
-            "correct_option": "B",
-            "explanation": "When called, a generator function returns a generator object. When iterated (via next()), it runs until the yield expression, pausing its execution frame until the next value is requested."
-        }
-    ],
-    "Java Developer": [
-        {
-            "question_text": "In the Java Virtual Machine (JVM), where are object instances allocated by default?",
-            "topic": "JVM Memory Architecture & GC",
-            "options": [
-                {"key": "A", "text": "On the Thread Stack"},
-                {"key": "B", "text": "In the Heap Memory"},
-                {"key": "C", "text": "In the Metaspace only"},
-                {"key": "D", "text": "In the Program Counter Register"}
-            ],
-            "correct_option": "B",
-            "explanation": "All Java class instances and arrays are allocated in the shared Heap memory managed by the Garbage Collector, while method frames and primitive references live on the thread stack."
-        }
-    ],
-    "DevOps Engineer": [
-        {
-            "question_text": "In Kubernetes, which resource controller is typically used to guarantee that a copy of a Pod runs on every Node in the cluster?",
-            "topic": "Kubernetes Pods & Services",
-            "options": [
-                {"key": "A", "text": "Deployment"},
-                {"key": "B", "text": "DaemonSet"},
-                {"key": "C", "text": "StatefulSet"},
-                {"key": "D", "text": "ReplicaSet"}
-            ],
-            "correct_option": "B",
-            "explanation": "A DaemonSet ensures that all (or some) Nodes run a copy of a Pod, commonly utilized for cluster storage daemons, log collection agents, or node monitoring."
-        }
-    ],
-    "Data Analyst": [
-        {
-            "question_text": "In SQL, what is the primary distinction between the ROW_NUMBER() and RANK() window functions?",
-            "topic": "SQL Window Functions & Aggregations",
-            "options": [
-                {"key": "A", "text": "ROW_NUMBER() assigns consecutive integers with no ties, while RANK() assigns the same rank to ties and skips subsequent numbers"},
-                {"key": "B", "text": "RANK() does not support ORDER BY within its OVER clause"},
-                {"key": "C", "text": "ROW_NUMBER() can only be computed over partitioned groups with fewer than 100 rows"},
-                {"key": "D", "text": "RANK() produces a dense sequence without any gaps even when duplicates exist"}
-            ],
-            "correct_option": "A",
-            "explanation": "ROW_NUMBER() always assigns unique sequential numbers (1, 2, 3, 4). RANK() gives tied values identical rank and skips the subsequent rank count (e.g., 1, 2, 2, 4)."
-        }
-    ]
-}
-
-FALLBACK_TEXT_BANK = {
-    "Frontend Developer": [
-        {
-            "question_text": "Explain how the React Virtual DOM diffing algorithm works, and describe why key props are crucial when rendering dynamic lists.",
-            "topic": "React Hooks & Lifecycle",
-            "model_answer": "The Virtual DOM is an in-memory representation of the real DOM tree. When state changes, React creates a new VDOM tree and runs a heuristic O(n) reconciliation algorithm based on two assumptions:\n1. Two elements of different types produce different trees.\n2. Developers can hint at stable identity across renders using the 'key' prop.\n\nWithout stable keys, React compares children index-by-index, causing unnecessary DOM recreations and corrupting local component states (like form inputs). Providing unique, stable keys allows React to identify insertions, deletions, and moves without re-rendering unaffected items."
-        },
-        {
-            "question_text": "What are the common strategies for optimizing web application performance and minimizing Core Web Vitals (LCP, FID/INP, CLS)?",
-            "topic": "Web Performance & Core Web Vitals",
-            "model_answer": "Optimizing web performance requires targeting key metrics:\n- **LCP (Largest Contentful Paint)**: Preload critical assets, use modern formats (AVIF/WebP), implement responsive srcsets, enable server-side caching (CDN edge caching), and inline critical CSS.\n- **INP (Interaction to Next Paint) / FID**: Code-split large bundles using dynamic imports, defer non-critical scripts, yield long tasks back to the main thread via requestIdleCallback or micro-tasks, and debounce expensive calculations.\n- **CLS (Cumulative Layout Shift)**: Always specify width and height attributes on images/videos, reserve layout space for dynamic ads/embeds, and avoid injecting content above existing content unless responding to user interaction."
-        }
-    ],
-    "Backend Developer": [
-        {
-            "question_text": "Discuss the trade-offs between relational (SQL) and non-relational (NoSQL) databases when designing a high-traffic production service.",
-            "topic": "Database Indexing & Query Optimization",
-            "model_answer": "Relational databases (e.g., PostgreSQL, MySQL) provide ACID guarantees, strict schemas, and strong relational querying with JOINs. They excel when data integrity, transactional consistency, and complex relations are critical (e.g., financial ledgering, ecommerce orders). However, horizontal scaling typically requires sharding or read replicas.\n\nNoSQL databases (e.g., MongoDB, DynamoDB, Cassandra) prioritize flexible schemas, horizontal partition scalability, and high write/read throughput across distributed clusters. They excel for document logs, time-series data, and rapidly evolving data shapes, but sacrifice multi-entity ACID transactions or require eventual consistency patterns."
-        },
-        {
-            "question_text": "How do you securely implement token-based authentication (JWT) while handling token revocation and refresh token rotation?",
-            "topic": "Authentication & JWT Security",
-            "model_answer": "A secure JWT architecture employs short-lived access tokens (e.g., 15 minutes) paired with long-lived refresh tokens (e.g., 7 days) stored in HttpOnly, Secure, SameSite cookies to protect against XSS and CSRF.\n- **Refresh Token Rotation**: Each time a refresh token is used, it is invalidated and replaced with a newly generated pair. If a revoked refresh token is replayed, the system detects token theft and invalidates the entire user token family.\n- **Revocation**: While stateless JWTs cannot be instantly invalidated without expiry, maintaining a lightweight distributed revocation denylist (in Redis) for blacklisted token JTI IDs balances stateless speed with security control."
-        }
-    ],
-    "Python Developer": [
-        {
-            "question_text": "Explain how Python manages memory using reference counting and the cyclic garbage collector. How does this impact long-running backend processes?",
-            "topic": "Memory Management & Reference Counting",
-            "model_answer": "CPython uses a two-tiered memory management system:\n1. **Reference Counting**: Every PyObject has an ob_refcnt counter. When a reference is created, it increments; when deleted or goes out of scope, it decrements. When ref count reaches 0, the object memory is immediately freed.\n2. **Cyclic Garbage Collection**: Reference counting cannot collect circular references (e.g., A references B and B references A). Python has a generational cyclic garbage collector (Generations 0, 1, 2) that detects unreferenced isolated object graphs using a pointer traversal algorithm.\n\nIn long-running backend processes, circular references or persistent global variables can lead to memory fragmentation and high memory watermarks. Developers should profile using 'gc' and 'tracemalloc', avoid circular dependencies, and employ weakref when appropriate."
-        }
-    ],
-    "Java Developer": [
-        {
-            "question_text": "Explain the concept of Dependency Injection in Spring Boot and how it promotes loose coupling and testability.",
-            "topic": "Spring Boot & Dependency Injection",
-            "model_answer": "Dependency Injection (DI) is an implementation of Inversion of Control (IoC). Instead of objects instantiating their own dependencies using 'new', the Spring IoC container creates, manages, and injects dependencies at runtime (typically via constructor injection).\n- **Loose Coupling**: Components depend on abstractions/interfaces rather than concrete implementations.\n- **Testability**: In unit tests, real service implementations can easily be swapped with mocks (e.g., Mockito) without modifying the production code."
-        }
-    ],
-    "DevOps Engineer": [
-        {
-            "question_text": "Describe the key principles of Continuous Integration and Continuous Deployment (CI/CD) and how you ensure zero-downtime releases.",
-            "topic": "CI/CD Pipelines & GitHub Actions",
-            "model_answer": "CI/CD automates software delivery:\n- **CI**: Frequent commits to trunk, automated linting, unit/integration testing, and container build verification on every pull request.\n- **CD**: Automated deployment to staging and production upon pipeline approval.\n- **Zero-Downtime Releases**: Achieved via Blue-Green deployments (switching traffic between two identical environments via router) or Rolling Updates in Kubernetes (gradually replacing old pods with new pods while monitoring readiness probes). Health checks ensure that new versions only receive traffic once fully initialized."
-        }
-    ],
-    "Data Analyst": [
-        {
-            "question_text": "Explain how you would handle missing data in a large analytical dataset. Compare imputation techniques versus deletion.",
-            "topic": "Data Cleaning & Handling Missing Values",
-            "model_answer": "Handling missing values starts with understanding the mechanism of missingness:\n1. **MCAR (Missing Completely at Random)**: Missingness is unrelated to any observed or unobserved data.\n2. **MAR (Missing at Random)**: Missingness is related to observed variables.\n3. **MNAR (Missing Not at Random)**: Missingness depends on the unobserved value itself.\n\n**Deletion**: Listwise deletion is safe only if MCAR and missingness is tiny (<5%), otherwise it induces severe sample bias and data loss.\n**Imputation**: Mean/median/mode imputation preserves sample size but suppresses variance. Advanced methods include KNN imputation, regression models, or MICE (Multiple Imputation by Chained Equations). For time-series, forward-fill (LOCF) or linear interpolation is standard."
-        }
-    ]
-}
 
 class AIService:
     @property
@@ -244,19 +26,18 @@ class AIService:
 
     @property
     def model(self) -> str:
-        return settings.GEMINI_MODEL or "gemini-3.5-flash-lite"
+        return settings.GEMINI_MODEL or "gemini-3.8-flash"
 
     @property
     def base_url(self) -> str:
         return f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
 
-    async def _call_gemini(self, prompt: str) -> Optional[str]:
-        """Calls Gemini API with structured JSON request and error resilience."""
+    async def _call_gemini(self, prompt: str, temperature: float = 0.3) -> Optional[str]:
+        """Calls Gemini API with structured JSON request and multi-model fallback resilience."""
         if not self.api_key or self.api_key.strip() == "":
-            logger.info("No GEMINI_API_KEY set; utilizing high-quality verified domain generator.")
+            logger.info("No GEMINI_API_KEY set; utilizing verified domain generator.")
             return None
 
-        url = f"{self.base_url}?key={self.api_key}"
         payload = {
             "contents": [
                 {
@@ -266,130 +47,332 @@ class AIService:
                 }
             ],
             "generationConfig": {
-                "temperature": 0.3,
+                "temperature": temperature,
                 "response_mime_type": "application/json"
             }
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            for attempt in range(2):
+        # Preferred models in order of capability & speed
+        models_to_try = [self.model, "gemini-3.8-flash", "gemini-3.5-flash-lite"]
+        unique_models = []
+        for m in models_to_try:
+            if m and m not in unique_models:
+                unique_models.append(m)
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for model_name in unique_models:
                 try:
-                    response = await client.post(url, json=payload)
+                    target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
+                    response = await client.post(target_url, json=payload)
                     if response.status_code == 200:
                         data = response.json()
                         candidates = data.get("candidates", [])
                         if candidates:
                             text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                            return text_content
+                            if text_content:
+                                return text_content
                     else:
-                        logger.warning(f"Gemini API returned status {response.status_code}: {response.text}")
+                        logger.warning(f"Gemini API ({model_name}) returned status {response.status_code}: {response.text[:200]}")
                 except Exception as e:
-                    logger.warning(f"Gemini API request attempt {attempt + 1} failed: {e}")
+                    logger.warning(f"Gemini API ({model_name}) request failed: {e}")
         return None
 
-    async def generate_questions(self, role: str, difficulty: str, mode: str, count: int) -> List[Dict[str, Any]]:
-        """Generates structured interview questions for the specified role, difficulty, and mode."""
-        prompt = f"""
-You are an expert technical interviewer assessing a {difficulty} {role}.
-Generate exactly {count} distinct technical interview questions suitable for {mode.upper()} mode.
+    async def generate_questions(
+        self,
+        role: str,
+        difficulty: str,
+        mode: str,
+        count: int,
+        exclude_questions: Optional[List[str]] = None,
+        topic_focus: Optional[str] = None,
+        experience_level: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Generates structured, domain-specific interview questions following progressive difficulty:
+        - Round 1 is ALWAYS Easy (foundations, syntax, core definitions).
+        - Subsequent rounds gradually increase in difficulty (Easy to Medium -> Medium -> Medium to Hard -> Hard).
+        - Strictly prevents duplicates and near-duplicates against excluded past questions.
+        """
+        # 1. Establish the round difficulty blueprint
+        round_specs = []
+        for i in range(count):
+            r_num = i + 1
+            r_diff = get_round_difficulty(r_num, count)
+            round_specs.append((r_num, r_diff))
 
-Requirements:
-- Role: {role}
-- Difficulty: {difficulty}
-- Mode: {mode}
-- Number of questions: {count}
-- Return strict JSON matching the schema below.
+        # 2. Pick domain focus topics
+        available_topics = get_topics_for_role(role)
+        sampled_topics = random.sample(available_topics, min(max(count, 3), len(available_topics)))
+        if topic_focus and topic_focus not in sampled_topics:
+            sampled_topics.insert(0, topic_focus)
+
+        # 3. Clean excluded questions list
+        clean_exclude = [q.strip() for q in (exclude_questions or []) if q and q.strip()]
+        exclude_section = ""
+        if clean_exclude:
+            # Pass up to 25 recent questions as negative examples
+            sample_exclusions = clean_exclude[:25]
+            bullet_list = "\n".join([f"- {q[:120]}" for q in sample_exclusions])
+            exclude_section = f"\nDO NOT repeat, duplicate, or rephrase any of these previously asked questions:\n{bullet_list}\n"
+
+        # 4. Construct round-by-round guide
+        round_guide_lines = [
+            f"- Question {r_num}: Round {r_num} • Difficulty '{r_diff}'. "
+            f"({'Test basic definitions, core syntax, and fundamentals' if r_num == 1 else 'Progressively increase technical depth, trade-offs, and practical engineering scenarios'})"
+            for r_num, r_diff in round_specs
+        ]
+        round_guide = "\n".join(round_guide_lines)
+
+        prompt = f"""You are an elite principal technical interviewer designing an interview for a {role} position.
+Experience Profile: {experience_level or difficulty}
+Mode: {mode.upper()}
+Total Questions: {count}
+
+Focus Topics:
+{', '.join(sampled_topics)}
+
+Round-by-Round Progression:
+{round_guide}
+{exclude_section}
+Mandatory Rules:
+1. Every question MUST be strictly relevant to {role}. Do NOT provide questions from unrelated technical fields.
+2. Question 1 (Round 1) MUST be Easy and test fundamental concepts or definitions of {role}.
+3. Subsequent questions must follow the designated progressive difficulty.
+4. Every question must be genuinely distinct with zero duplicate or near-duplicate concepts.
+5. If mode is 'mcq', provide exactly 4 distinct, plausible options ('A', 'B', 'C', 'D'), a correct_option key, and a clear explanation.
+6. If mode is 'text', provide a comprehensive ideal model_answer.
+7. Return strict JSON matching the schema below.
 
 JSON Schema:
 {{
   "questions": [
     {{
-      "question_text": "string",
+      "round_number": 1,
+      "difficulty": "Easy",
       "topic": "string",
+      "question_text": "string",
       "options": [
         {{"key": "A", "text": "option 1"}},
         {{"key": "B", "text": "option 2"}},
         {{"key": "C", "text": "option 3"}},
         {{"key": "D", "text": "option 4"}}
-      ], // exactly 4 options if mode is 'mcq', null or empty list if mode is 'text'
-      "correct_option": "A" or "B" or "C" or "D", // valid option key if mcq, null if text
-      "explanation": "concise technical explanation of why the correct option is right", // if mcq, null if text
-      "model_answer": "comprehensive ideal model answer with code examples where useful" // if text, null if mcq
+      ],
+      "correct_option": "A",
+      "explanation": "string",
+      "model_answer": null
     }}
   ]
 }}
-Ensure the questions test deep practical engineering knowledge relevant to {role}.
 """
-        raw_response = await self._call_gemini(prompt)
+        raw_response = await self._call_gemini(prompt, temperature=0.7)
         if raw_response:
             try:
                 parsed = json.loads(raw_response)
-                questions = parsed.get("questions", [])
-                if isinstance(questions, list) and len(questions) > 0:
-                    # Validate questions format
-                    valid_questions = []
-                    for q in questions[:count]:
+                questions_raw = parsed.get("questions", [])
+                if isinstance(questions_raw, list) and len(questions_raw) > 0:
+                    valid_questions: List[Dict[str, Any]] = []
+                    seen_in_batch: List[str] = []
+
+                    for idx, q in enumerate(questions_raw):
+                        q_text = (q.get("question_text") or "").strip()
+                        if not q_text:
+                            continue
+
+                        # Check for duplicate against past history or within this batch
+                        if is_duplicate_or_near_duplicate(q_text, clean_exclude + seen_in_batch):
+                            logger.info(f"Rejected duplicate generated question: {q_text[:60]}")
+                            continue
+
+                        assigned_round = idx + 1
+                        assigned_diff = get_round_difficulty(assigned_round, count)
+
                         if mode == "mcq":
                             opts = q.get("options", [])
                             if len(opts) == 4 and q.get("correct_option") in ["A", "B", "C", "D"]:
                                 valid_questions.append({
-                                    "question_text": q.get("question_text"),
+                                    "question_text": q_text,
                                     "role": role,
-                                    "difficulty": difficulty,
-                                    "topic": q.get("topic", "General Technical"),
+                                    "round_number": assigned_round,
+                                    "difficulty": assigned_diff,
+                                    "topic": q.get("topic", random.choice(sampled_topics)),
                                     "question_type": "mcq",
                                     "options": json.dumps(opts),
                                     "correct_option": q.get("correct_option"),
                                     "explanation": q.get("explanation", ""),
                                     "model_answer": None
                                 })
+                                seen_in_batch.append(q_text)
                         else:
                             valid_questions.append({
-                                "question_text": q.get("question_text"),
+                                "question_text": q_text,
                                 "role": role,
-                                "difficulty": difficulty,
-                                "topic": q.get("topic", "Technical Architecture"),
+                                "round_number": assigned_round,
+                                "difficulty": assigned_diff,
+                                "topic": q.get("topic", random.choice(sampled_topics)),
                                 "question_type": "text",
                                 "options": None,
                                 "correct_option": None,
                                 "explanation": None,
                                 "model_answer": q.get("model_answer", "")
                             })
-                    if len(valid_questions) >= count:
+                            seen_in_batch.append(q_text)
+
+                        if len(valid_questions) >= count:
+                            break
+
+                    if len(valid_questions) == count:
                         return valid_questions
+                    elif len(valid_questions) > 0:
+                        # Supplement any missing questions with verified fallback
+                        missing_count = count - len(valid_questions)
+                        supplement = self._get_fallback_questions(
+                            role=role,
+                            difficulty=difficulty,
+                            mode=mode,
+                            count=missing_count,
+                            exclude_questions=clean_exclude + seen_in_batch,
+                            start_round=len(valid_questions) + 1,
+                            total_rounds=count
+                        )
+                        return valid_questions + supplement
             except Exception as e:
                 logger.error(f"Error parsing Gemini questions response: {e}")
 
-        # Resilient fallback questions generator
-        return self._get_fallback_questions(role, difficulty, mode, count)
+        # Resilient fallback questions generator with progressive difficulty and strict deduplication
+        return self._get_fallback_questions(
+            role=role,
+            difficulty=difficulty,
+            mode=mode,
+            count=count,
+            exclude_questions=clean_exclude,
+            start_round=1,
+            total_rounds=count
+        )
 
-    def _get_fallback_questions(self, role: str, difficulty: str, mode: str, count: int) -> List[Dict[str, Any]]:
-        """Provides verified, high-quality domain questions when API is offline or unconfigured."""
-        bank = FALLBACK_MCQ_BANK if mode == "mcq" else FALLBACK_TEXT_BANK
-        role_questions = bank.get(role, bank.get("Backend Developer", []))
-        
-        # If count requested is larger than bank, duplicate with slight variations
-        selected = []
+    def _get_fallback_questions(
+        self,
+        role: str,
+        difficulty: str,
+        mode: str,
+        count: int,
+        exclude_questions: Optional[List[str]] = None,
+        start_round: int = 1,
+        total_rounds: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Provides verified, domain-specific questions matching progressive difficulty tiers.
+        Guarantees that:
+        - Round 1 is Easy
+        - Subsequent rounds progress toward Hard
+        - No duplicate questions are ever served
+        - Never gets stuck cycling through only 2 questions
+        """
+        effective_total = total_rounds or (start_round + count - 1)
+        bank_map = get_fallback_bank_for_role(role, mode)
+
+        exclude_list = [q.strip() for q in (exclude_questions or []) if q and q.strip()]
+        selected: List[Dict[str, Any]] = []
+        chosen_texts: List[str] = list(exclude_list)
+
+        difficulty_order = ["Easy", "Easy to Medium", "Medium", "Medium to Hard", "Hard"]
+
         for i in range(count):
-            base = role_questions[i % len(role_questions)]
+            round_num = start_round + i
+            target_diff = get_round_difficulty(round_num, effective_total)
+
+            # 1. Look for questions directly in the target difficulty tier
+            tier_candidates = list(bank_map.get(target_diff, []))
+            random.shuffle(tier_candidates)
+            candidate = None
+
+            for q in tier_candidates:
+                q_text = q["question_text"]
+                if not is_duplicate_or_near_duplicate(q_text, chosen_texts):
+                    candidate = q
+                    break
+
+            # 2. If all questions in that tier are used, search adjacent tiers in the same domain
+            if not candidate:
+                all_domain_questions: List[Dict[str, Any]] = []
+                # Search nearest difficulty tiers first
+                for diff_tier in difficulty_order:
+                    all_domain_questions.extend(bank_map.get(diff_tier, []))
+                random.shuffle(all_domain_questions)
+
+                for q in all_domain_questions:
+                    q_text = q["question_text"]
+                    if not is_duplicate_or_near_duplicate(q_text, chosen_texts):
+                        candidate = q
+                        break
+
+            # 3. If the entire domain bank was exhausted across all previous sessions, generate a distinct dynamic variant
+            if not candidate:
+                candidate = self._generate_dynamic_domain_fallback(role, target_diff, mode, round_num, chosen_texts)
+
+            chosen_texts.append(candidate["question_text"])
+
             item = {
-                "question_text": base["question_text"],
+                "question_text": candidate["question_text"],
                 "role": role,
-                "difficulty": difficulty,
-                "topic": base["topic"],
+                "round_number": round_num,
+                "difficulty": target_diff,
+                "topic": candidate.get("topic", f"{role} Core Knowledge"),
                 "question_type": mode,
-                "options": json.dumps(base["options"]) if mode == "mcq" else None,
-                "correct_option": base.get("correct_option") if mode == "mcq" else None,
-                "explanation": base.get("explanation") if mode == "mcq" else None,
-                "model_answer": base.get("model_answer") if mode == "text" else None
+                "options": json.dumps(candidate["options"]) if mode == "mcq" and isinstance(candidate.get("options"), list) else candidate.get("options"),
+                "correct_option": candidate.get("correct_option") if mode == "mcq" else None,
+                "explanation": candidate.get("explanation") if mode == "mcq" else None,
+                "model_answer": candidate.get("model_answer") if mode == "text" else None
             }
             selected.append(item)
+
         return selected
 
-    async def evaluate_text_answer(self, role: str, difficulty: str, question_text: str, user_answer: str, topic: str) -> Dict[str, Any]:
+    def _generate_dynamic_domain_fallback(
+        self,
+        role: str,
+        difficulty: str,
+        mode: str,
+        round_num: int,
+        seen_texts: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Dynamically synthesizes a verified domain-specific question to ensure zero collisions
+        even if an interview exceeds the pre-stored question bank size.
+        """
+        topics = get_topics_for_role(role)
+        chosen_topic = topics[(round_num - 1) % len(topics)]
+        seed_id = len(seen_texts) + 1
+
+        if mode == "mcq":
+            return {
+                "question_text": f"In {role} engineering, how is {chosen_topic} primarily implemented to optimize system maintainability and performance (Scenario #{seed_id})?",
+                "topic": chosen_topic,
+                "options": [
+                    {"key": "A", "text": f"By isolating {chosen_topic} responsibilities using clear architectural abstractions"},
+                    {"key": "B", "text": "By hardcoding global mutable variables across all modules"},
+                    {"key": "C", "text": "By bypassing runtime validation and error handlers"},
+                    {"key": "D", "text": "By duplicating code routines across separate processes"}
+                ],
+                "correct_option": "A",
+                "explanation": f"In production {role} systems, {chosen_topic} is implemented through modular abstractions and separation of concerns to ensure maintainability."
+            }
+        else:
+            return {
+                "question_text": f"Explain the architectural trade-offs, practical implementation patterns, and error handling strategies for {chosen_topic} in a production {role} environment (Scenario #{seed_id}).",
+                "topic": chosen_topic,
+                "model_answer": f"When implementing {chosen_topic} for a {role} system, engineers must account for performance, failure modes, monitoring, and modularity. Production solutions decouple implementation details through interfaces, enforce strict typing and error logging, and measure latency and throughput under peak load."
+            }
+
+    async def evaluate_text_answer(
+        self,
+        role: str,
+        difficulty: str,
+        question_text: str,
+        user_answer: str,
+        topic: str
+    ) -> Dict[str, Any]:
         """Evaluates a text-based interview response against 6 rigorous criteria using Gemini or heuristic engine."""
-        prompt = f"""
-You are an expert technical interviewer evaluating an engineering candidate for a {difficulty} {role} position.
+        prompt = f"""You are an expert technical interviewer evaluating an engineering candidate for a {difficulty} {role} position.
 
 Question: {question_text}
 Topic: {topic}
@@ -414,7 +397,7 @@ Return strict JSON matching the following schema:
 }}
 Do NOT award high marks merely for length; evaluate technical precision.
 """
-        raw_response = await self._call_gemini(prompt)
+        raw_response = await self._call_gemini(prompt, temperature=0.2)
         if raw_response:
             try:
                 data = json.loads(raw_response)
@@ -434,12 +417,17 @@ Do NOT award high marks merely for length; evaluate technical precision.
         # Algorithmic fallback evaluator for offline/resilience
         return self._heuristic_evaluate_text(question_text, user_answer, role, difficulty)
 
-    def _heuristic_evaluate_text(self, question_text: str, user_answer: str, role: str, difficulty: str) -> Dict[str, Any]:
+    def _heuristic_evaluate_text(
+        self,
+        question_text: str,
+        user_answer: str,
+        role: str,
+        difficulty: str
+    ) -> Dict[str, Any]:
         """Deterministic evaluation fallback analyzing keywords, structure, and depth."""
         cleaned = user_answer.strip().lower()
         word_count = len(cleaned.split())
 
-        # Base scoring on depth, length, and technical articulation
         if word_count < 10:
             score = 2
             feedback = "The answer is too brief to demonstrate adequate technical depth for this question."

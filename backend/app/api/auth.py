@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.user import User
@@ -9,8 +9,8 @@ from app.services.auth_service import AuthService, get_current_user
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-def register(user_in: UserRegister, db: Session = Depends(get_db)):
-    user = AuthService.register(db, user_in)
+async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
+    user = await AuthService.register(db, user_in)
     access_token = create_access_token(subject=user.id)
     return {
         "access_token": access_token,
@@ -19,8 +19,8 @@ def register(user_in: UserRegister, db: Session = Depends(get_db)):
     }
 
 @router.post("/login", response_model=Token)
-def login(user_in: UserLogin, db: Session = Depends(get_db)):
-    user = AuthService.authenticate(db, user_in)
+async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
+    user = await AuthService.authenticate(db, user_in)
     access_token = create_access_token(subject=user.id)
     return {
         "access_token": access_token,
@@ -29,9 +29,9 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     }
 
 @router.post("/logout")
-def logout(current_user: User = Depends(get_current_user)):
+async def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Successfully logged out."}
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user)):
     return current_user

@@ -12,6 +12,8 @@ class Interview(Base):
     difficulty = Column(String(50), nullable=False)
     mode = Column(String(20), nullable=False)  # "mcq" or "text"
     num_questions = Column(Integer, nullable=False, default=5)
+    current_round = Column(Integer, nullable=False, default=1)
+    current_difficulty = Column(String(50), nullable=False, default="Easy")
     status = Column(String(30), nullable=False, default="in_progress")  # "in_progress", "completed"
     total_score = Column(Float, default=0.0)
     max_score = Column(Float, default=0.0)
