@@ -31,15 +31,9 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 3. Smart Render hostname mapping:
-  // When running on Render (e.g. mockmate-frontend.onrender.com), automatically point to mockmate-backend
+  // 3. Known Render backend fallback
   if (typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com")) {
-    const currentHost = window.location.hostname;
-    let backendHost = currentHost.replace("-frontend", "-backend").replace("frontend", "backend");
-    if (backendHost === currentHost) {
-      backendHost = "mockmate-backend.onrender.com";
-    }
-    return `https://${backendHost}/api`;
+    return "https://mockmate-backend-hhge.onrender.com/api";
   }
 
   // 4. Default to localhost for local development
@@ -92,10 +86,16 @@ export async function apiRequest<T = any>(
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${baseUrl}${cleanEndpoint}`;
 
+  const controller = new AbortController();
+  const timeoutMs = 20000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const signal = options.signal || controller.signal;
+
   try {
     const response = await fetch(url, {
       ...options,
       headers,
+      signal,
     });
 
     if (response.status === 204) {
@@ -111,10 +111,15 @@ export async function apiRequest<T = any>(
 
     return data as T;
   } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new ApiError(408, `Connection timed out reaching ${url}. On Render free tier, services may take ~30–50s to wake up. Please retry.`);
+    }
     if (error instanceof ApiError) {
       throw error;
     }
     throw new ApiError(500, error.message || "Network connection error");
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

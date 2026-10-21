@@ -6,21 +6,18 @@ from app.core.database import engine, Base
 import app.models  # Ensures all models are registered
 from app.api import api_router
 
+import logging
+import traceback
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger("uvicorn.error")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Ensure database tables exist asynchronously on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        from sqlalchemy import text
-        for sql in [
-            "ALTER TABLE interviews ADD COLUMN current_round INTEGER DEFAULT 1",
-            "ALTER TABLE interviews ADD COLUMN current_difficulty VARCHAR(50) DEFAULT 'Easy'",
-            "ALTER TABLE questions ADD COLUMN round_number INTEGER DEFAULT 1",
-        ]:
-            try:
-                await conn.execute(text(sql))
-            except Exception:
-                pass  # Column already exists
     yield
     # Graceful connection pool disposal on shutdown
     await engine.dispose()
@@ -32,6 +29,16 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global unhandled error at {request.method} {request.url.path}: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}"}
+    )
+
 
 # CORS Middleware setup
 app.add_middleware(

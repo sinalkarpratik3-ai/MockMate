@@ -30,9 +30,9 @@ services:
     dockerContext: ./frontend
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        value: https://mockmate-backend.onrender.com/api
+        value: https://mockmate-backend-hhge.onrender.com/api
       - key: BACKEND_URL
-        value: https://mockmate-backend.onrender.com
+        value: https://mockmate-backend-hhge.onrender.com
 
 databases:
   # Managed PostgreSQL Database
