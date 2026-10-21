@@ -18,8 +18,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const runtimeApiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.BACKEND_URL ||
+    "";
+
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <head>
+        <script
+          id="mockmate-runtime-env"
+          dangerouslySetInnerHTML={{
+            __html: `window.__MOCKMATE_API_URL__ = ${JSON.stringify(runtimeApiUrl)};`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col font-sans bg-[#F7F3EA] text-[#252923]">
         <AuthProvider>
           {children}

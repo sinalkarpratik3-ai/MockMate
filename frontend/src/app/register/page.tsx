@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { getApiBaseUrl } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -53,7 +54,12 @@ export default function RegisterPage() {
         typeof msg === "string" &&
         (msg.includes("Failed to fetch") || msg.includes("Network connection error"))
       ) {
-        setError("Unable to connect to the backend server. Please check that the backend is running on port 8000.");
+        const apiUrl = getApiBaseUrl();
+        if (apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1")) {
+          setError("Unable to connect to the backend server. Please verify your local backend is running on port 8000.");
+        } else {
+          setError(`Connecting to backend at ${apiUrl}... On Render free tier, inactive services take ~30–50s to spin up. Please wait 30 seconds and retry.`);
+        }
       } else {
         setError(typeof msg === "string" ? msg : JSON.stringify(msg));
       }

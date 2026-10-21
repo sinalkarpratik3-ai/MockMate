@@ -10,26 +10,40 @@ export class ApiError extends Error {
 }
 
 export function getApiBaseUrl(): string {
+  // 1. Runtime script variable injected by RootLayout SSR inside container
+  if (typeof window !== "undefined" && (window as any).__MOCKMATE_API_URL__) {
+    const runtimeUrl = String((window as any).__MOCKMATE_API_URL__).trim();
+    if (runtimeUrl.length > 0 && !runtimeUrl.includes("localhost:8000")) {
+      return runtimeUrl.endsWith("/api") ? runtimeUrl : `${runtimeUrl.replace(/\/+$/, "")}/api`;
+    }
+  }
+
+  // 2. Build-time environment variable
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl && envUrl.trim().length > 0) {
     const trimmed = envUrl.trim();
-    // If running in browser on a remote host (e.g., *.onrender.com) and env has localhost:8000,
-    // fallback to same-origin /api so Next.js rewrites proxy it correctly
-    if (
+    const isRemote =
       typeof window !== "undefined" &&
       window.location.hostname !== "localhost" &&
-      window.location.hostname !== "127.0.0.1" &&
-      trimmed.includes("localhost:8000")
-    ) {
-      return "/api";
+      window.location.hostname !== "127.0.0.1";
+    if (!isRemote || !trimmed.includes("localhost:8000")) {
+      return trimmed.endsWith("/api") ? trimmed : `${trimmed.replace(/\/+$/, "")}/api`;
     }
-    return trimmed.endsWith("/api") ? trimmed : `${trimmed.replace(/\/+$/, "")}/api`;
   }
-  // When running in the browser, fallback to same-origin /api (handled by Next.js rewrites)
-  if (typeof window !== "undefined") {
-    return "/api";
+
+  // 3. Smart Render hostname mapping:
+  // When running on Render (e.g. mockmate-frontend.onrender.com), automatically point to mockmate-backend
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com")) {
+    const currentHost = window.location.hostname;
+    let backendHost = currentHost.replace("-frontend", "-backend").replace("frontend", "backend");
+    if (backendHost === currentHost) {
+      backendHost = "mockmate-backend.onrender.com";
+    }
+    return `https://${backendHost}/api`;
   }
-  return "http://127.0.0.1:8000/api";
+
+  // 4. Default to localhost for local development
+  return "http://localhost:8000/api";
 }
 
 export function extractErrorMessage(data: any, status: number): string {
