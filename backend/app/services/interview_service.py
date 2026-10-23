@@ -118,7 +118,7 @@ class InterviewService:
 
         num_questions = min(max(interview_in.num_questions, 1), 10)
 
-        # Query past questions for this user and domain to prevent repetition across sessions
+        # Query past questions for this user and domain to prevent repetition across immediate recent sessions
         stmt = (
             select(Question.question_text)
             .join(Interview, Question.interview_id == Interview.id)
@@ -128,6 +128,8 @@ class InterviewService:
         )
         res = await db.execute(stmt)
         recent_questions = [row[0] for row in res.all() if row[0]]
+        # Bounded sliding window to avoid cumulative starvation across consecutive tests
+        sliding_exclusions = recent_questions[:max(num_questions * 2, 10)]
 
         # Generate questions with progressive difficulty (Round 1 is Easy, progressing to Hard)
         generated_questions = await ai_service.generate_questions(
@@ -135,11 +137,17 @@ class InterviewService:
             difficulty=difficulty,
             mode=mode,
             count=num_questions,
-            exclude_questions=recent_questions,
+            exclude_questions=sliding_exclusions,
             experience_level=difficulty
         )
 
-        initial_diff = generated_questions[0]["difficulty"] if generated_questions else "Easy"
+        if not generated_questions:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unable to generate questions for {role}. Please retry or choose another role."
+            )
+
+        initial_diff = generated_questions[0]["difficulty"]
 
         db_interview = Interview(
             user_id=user.id,

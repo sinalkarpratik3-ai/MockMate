@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -10,6 +10,8 @@ ROOT_DIR = BASE_DIR.parent  # MockMate/
 class Settings(BaseSettings):
     PROJECT_NAME: str = "MockMate - Interview Preparation Platform"
     API_V1_STR: str = "/api"
+    ENVIRONMENT: str = "development"
+    AUTO_MIGRATE_ON_STARTUP: bool = True
     
     # Security
     SECRET_KEY: str = "super-secret-jwt-key-for-mockmate-dev-2026-secure"
@@ -30,7 +32,9 @@ class Settings(BaseSettings):
             return url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
         if url.startswith("sqlite://"):
             return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
-        if url.startswith("postgres://"):
+        if url.startswith("postgresql+asyncpg://"):
+            pass
+        elif url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -52,15 +56,35 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "https://mockmate.onrender.com",
     ]
     
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    def assemble_cors_origins(cls, v: Any) -> List[str]:
+        if isinstance(v, str):
+            import json
+            v_trimmed = v.strip()
+            if v_trimmed.startswith("[") and v_trimmed.endswith("]"):
+                try:
+                    return json.loads(v_trimmed)
+                except Exception:
+                    pass
+            return [origin.strip().rstrip("/") for origin in v.split(",") if origin.strip()]
+        elif isinstance(v, list):
+            return [str(origin).strip().rstrip("/") for origin in v if str(origin).strip()]
+        return v
+
     @field_validator("DATABASE_URL", mode="before")
     def assemble_db_connection(cls, v: str) -> str:
-        # Prevent silent SQLite fallback on Render production
-        if os.getenv("RENDER") == "true" and (not v or "sqlite" in v):
+        # Prevent silent SQLite fallback on production (AWS ECS, or ENVIRONMENT=production)
+        is_production = (
+            os.getenv("ENVIRONMENT", "").lower() == "production"
+            or os.getenv("ENV", "").lower() == "production"
+            or bool(os.getenv("AWS_EXECUTION_ENV"))
+            or bool(os.getenv("ECS_CONTAINER_METADATA_URI"))
+        )
+        if is_production and (not v or "sqlite" in v.lower()):
             raise ValueError(
-                "Production environment on Render detected, but no valid PostgreSQL DATABASE_URL was configured. "
+                "Production environment detected, but no valid PostgreSQL DATABASE_URL was configured. "
                 "SQLite is disabled in production to prevent silent data loss across container restarts."
             )
         if v and v.startswith("postgres://"):

@@ -4,13 +4,12 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
-import { Interview, Question, Answer } from "@/types";
+import { Interview, Question, Answer, BookmarkItem } from "@/types";
 import { 
   CheckCircle2, 
   ArrowRight, 
   ArrowLeft, 
   Loader2, 
-  Target, 
   AlertCircle, 
   Award, 
   BookOpen, 
@@ -45,19 +44,78 @@ function InterviewWorkspaceContent() {
   const [savingBookmarkId, setSavingBookmarkId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchInterview();
-    fetchUserBookmarks();
-  }, [interviewId]);
+    let ignore = false;
 
-  const fetchUserBookmarks = async () => {
-    try {
-      const bms = await apiRequest<any[]>("/bookmarks");
-      const ids = new Set<number>(bms.map((b) => b.question_id));
-      setBookmarkedIds(ids);
-    } catch (err) {
-      console.warn("Could not fetch user bookmarks:", err);
-    }
-  };
+    // Cleanly reset workspace state for the new session
+    setInterview(null);
+    setLoading(true);
+    setError(null);
+    setCurrentIndex(0);
+    setSelectedOptions({});
+    setTextAnswers({});
+    setEvaluatedAnswers({});
+    setSubmittingInterview(false);
+    setShowConfirmModal(false);
+
+    apiRequest<Interview>(`/interviews/${interviewId}`, { cache: "no-store" })
+      .then((data) => {
+        if (!ignore) {
+          if (!data || !data.questions || data.questions.length === 0) {
+            setError("No practice questions were returned for this session. Please return to setup and try again.");
+            return;
+          }
+          if (data.status === "completed") {
+            router.push(`/interviews/${interviewId}/results`);
+            return;
+          }
+          setInterview(data);
+          setCurrentIndex(0);
+          if (data.answers && data.answers.length > 0) {
+            const mcqMap: Record<number, string> = {};
+            const textMap: Record<number, string> = {};
+            const evalMap: Record<number, Answer> = {};
+
+            data.answers.forEach((ans) => {
+              if (ans.selected_option) mcqMap[ans.question_id] = ans.selected_option;
+              if (ans.text_answer) textMap[ans.question_id] = ans.text_answer;
+              evalMap[ans.question_id] = ans;
+            });
+
+            setSelectedOptions(mcqMap);
+            setTextAnswers(textMap);
+            setEvaluatedAnswers(evalMap);
+          } else {
+            setSelectedOptions({});
+            setTextAnswers({});
+            setEvaluatedAnswers({});
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load practice session.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    apiRequest<BookmarkItem[]>("/bookmarks")
+      .then((bms) => {
+        if (!ignore) {
+          const ids = new Set<number>(bms.map((b) => b.question_id));
+          setBookmarkedIds(ids);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch user bookmarks:", err);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [interviewId, router]);
 
   const handleToggleBookmark = async (questionId: number) => {
     setSavingBookmarkId(questionId);
@@ -74,50 +132,11 @@ function InterviewWorkspaceContent() {
         await apiRequest(`/bookmarks/${questionId}`, { method: "POST" });
         setBookmarkedIds((prev) => new Set(prev).add(questionId));
       }
-    } catch (err: any) {
-      alert(err.message || "Bookmark action failed.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Bookmark action failed.";
+      alert(msg);
     } finally {
       setSavingBookmarkId(null);
-    }
-  };
-
-  const fetchInterview = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiRequest<Interview>(`/interviews/${interviewId}`);
-      
-      if (data.status === "completed") {
-        router.push(`/interviews/${interviewId}/results`);
-        return;
-      }
-
-      setInterview(data);
-
-      // Hydrate existing answers if resumed
-      if (data.answers && data.answers.length > 0) {
-        const mcqMap: Record<number, string> = {};
-        const textMap: Record<number, string> = {};
-        const evalMap: Record<number, Answer> = {};
-
-        data.answers.forEach((ans) => {
-          if (ans.selected_option) {
-            mcqMap[ans.question_id] = ans.selected_option;
-          }
-          if (ans.text_answer) {
-            textMap[ans.question_id] = ans.text_answer;
-          }
-          evalMap[ans.question_id] = ans;
-        });
-
-        setSelectedOptions(mcqMap);
-        setTextAnswers(textMap);
-        setEvaluatedAnswers(evalMap);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load practice session.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -164,8 +183,9 @@ function InterviewWorkspaceContent() {
       } catch {
         // Fallback silently if background refresh fails
       }
-    } catch (err: any) {
-      alert(err.message || "Review failed. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Review failed. Please try again.";
+      alert(msg);
     } finally {
       setEvaluatingQuestion(false);
     }
@@ -213,8 +233,9 @@ function InterviewWorkspaceContent() {
       }
 
       router.push(`/interviews/${interviewId}/results`);
-    } catch (err: any) {
-      alert(err.message || "Failed to complete practice session.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to complete practice session.";
+      alert(msg);
       setSubmittingInterview(false);
     }
   };
@@ -237,12 +258,32 @@ function InterviewWorkspaceContent() {
           <AlertCircle className="h-10 w-10 text-[#B8473F] mx-auto mb-3" />
           <h2 className="text-lg font-bold text-[#252923]">Session Notice</h2>
           <p className="text-xs text-[#777B74] mt-1">{error || "Could not load practice questions."}</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="mt-6 px-4 py-2 rounded-xl bg-[#24483F] text-[#F7F3EA] text-xs font-semibold hover:bg-[#1A342D]"
-          >
-            Return to Dashboard
-          </button>
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <button
+              onClick={() => router.push("/interviews/new")}
+              className="px-4 py-2 rounded-xl bg-[#24483F] text-[#F7F3EA] text-xs font-semibold hover:bg-[#1A342D]"
+            >
+              Start New Test
+            </button>
+            <button
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                apiRequest<Interview>(`/interviews/${interviewId}`, { cache: "no-store" })
+                  .then((data) => {
+                    setInterview(data);
+                    setCurrentIndex(0);
+                  })
+                  .catch((err: unknown) => {
+                    setError(err instanceof Error ? err.message : "Retry failed.");
+                  })
+                  .finally(() => setLoading(false));
+              }}
+              className="px-4 py-2 rounded-xl border border-[#E8DDCA] bg-white text-[#252923] text-xs font-semibold hover:bg-[#FAF8F4]"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </AppLayout>
     );

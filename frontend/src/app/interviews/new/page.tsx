@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
@@ -70,12 +70,13 @@ function NewInterviewContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Synchronize state when navigating from "Practise Again" with query parameters
+  React.useEffect(() => {
+    setLoading(false);
+    setError(null);
     if (roleParam) {
-      const match = ROLES.find((r) => r.id.toLowerCase() === roleParam.toLowerCase());
-      if (match) {
-        setSelectedRoleId(match.id);
-        setCustomRoleText("");
+      if (isPresetRole) {
+        setSelectedRoleId(ROLES.find((r) => r.id.toLowerCase() === roleParam.toLowerCase())!.id);
       } else {
         setSelectedRoleId("Custom");
         setCustomRoleText(roleParam);
@@ -84,13 +85,13 @@ function NewInterviewContent() {
     if (diffParam && ["Junior", "Mid-Level", "Senior"].includes(diffParam)) {
       setSelectedDifficulty(diffParam);
     }
-    if (modeParam && ["mcq", "text"].includes(modeParam)) {
+    if (modeParam && (modeParam === "text" || modeParam === "mcq")) {
       setSelectedMode(modeParam as "mcq" | "text");
     }
     if (countParam && [3, 5, 10].includes(countParam)) {
       setQuestionCount(countParam);
     }
-  }, [roleParam, diffParam, modeParam, countParam]);
+  }, [roleParam, diffParam, modeParam, countParam, isPresetRole]);
 
   const effectiveRole = selectedRoleId === "Custom" ? customRoleText.trim() : selectedRoleId;
 
@@ -104,6 +105,12 @@ function NewInterviewContent() {
 
     setLoading(true);
 
+    // Bounded safety watchdog: if client navigation or response takes > 12s, reset button so user is never stuck
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError("Question preparation is taking longer than usual. Please click Retry.");
+    }, 12000);
+
     try {
       const interview = await apiRequest<Interview>("/interviews/create", {
         method: "POST",
@@ -115,9 +122,17 @@ function NewInterviewContent() {
         }),
       });
 
+      clearTimeout(safetyTimer);
+
+      if (!interview || !interview.id) {
+        throw new Error("Received an incomplete response from server. Please retry.");
+      }
+
       router.push(`/interviews/${interview.id}`);
-    } catch (err: any) {
-      setError(err.message || "Failed to prepare your practice session. Please try again.");
+    } catch (err: unknown) {
+      clearTimeout(safetyTimer);
+      const msg = err instanceof Error ? err.message : "Failed to prepare your practice session. Please try again.";
+      setError(msg);
       setLoading(false);
     }
   };
@@ -139,9 +154,19 @@ function NewInterviewContent() {
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-[#B8473F] text-xs flex items-start gap-2.5">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="p-4 rounded-xl bg-[#FDF1F0] border border-[#E8DDCA] text-[#B8473F] text-xs flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={loading}
+              className="px-3.5 py-1.5 rounded-lg bg-[#B8473F] text-white text-xs font-bold hover:bg-[#9B3730] transition-colors shrink-0 disabled:opacity-50"
+            >
+              Retry
+            </button>
           </div>
         )}
 

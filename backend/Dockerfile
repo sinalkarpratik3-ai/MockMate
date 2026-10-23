@@ -1,6 +1,6 @@
 # ==============================================================================
 # MockMate - Backend API Dockerfile (FastAPI / Python 3.11)
-# Optimized for Render Web Services & Docker Compose
+# Production Ready for AWS ECS Fargate & Docker
 # ==============================================================================
 
 FROM python:3.11-slim
@@ -33,5 +33,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
 
-# Launch uvicorn listening on Render's dynamic $PORT or fallback to 8000
+# Launch uvicorn listening on 0.0.0.0 and dynamic $PORT or fallback to 8000
 CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

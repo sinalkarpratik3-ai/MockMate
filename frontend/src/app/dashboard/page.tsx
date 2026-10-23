@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -26,22 +26,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, []);
-
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const summary = await apiRequest<DashboardSummary>("/dashboard");
       setData(summary);
-    } catch (err: any) {
-      setError(err.message || "Failed to load dashboard metrics.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load dashboard metrics.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    apiRequest<DashboardSummary>("/dashboard")
+      .then((summary) => {
+        if (!ignore) {
+          setData(summary);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load dashboard metrics.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   return (
     <AppLayout>

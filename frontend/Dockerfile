@@ -1,6 +1,6 @@
 # ==============================================================================
 # MockMate - Frontend Next.js Dockerfile (Node.js 20 Alpine)
-# Optimized for Render Web Services
+# Production Ready for AWS ECS Fargate & Docker
 # ==============================================================================
 
 # Stage 1: Install dependencies
@@ -45,5 +45,5 @@ COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
 
-# Start Next.js on Render's dynamic $PORT or fallback to 3000
+# Start Next.js on dynamic $PORT or fallback to 3000 (0.0.0.0 for container networking)
 CMD ["sh", "-c", "exec npm run start -- -p ${PORT:-3000} -H 0.0.0.0"]

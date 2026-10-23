@@ -1,0 +1,697 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MockMate Production AWS CloudFormation Template.
+  Deploys a robust, cost-effective infrastructure for the MockMate Interview Preparation Platform:
+  - VPC with 2 Public Subnets & 2 Private Subnets across 2 Availability Zones
+  - Amazon RDS PostgreSQL (Free-Tier eligible db.t4g.micro/db.t3.micro, Private)
+  - Application Load Balancer with Path-Based Routing (/api/* to Backend, /* to Frontend)
+  - Amazon ECS with AWS Fargate (Backend and Frontend containers)
+  - Amazon ECR Repositories for backend and frontend container images
+  - AWS Secrets Manager for application credentials and database passwords
+  - Amazon CloudWatch Log Groups for centralized container logging
+  - Least-privilege IAM Roles and security groups
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: mockmate-prod
+    Description: Prefix used to name and tag resources.
+
+  DBUsername:
+    Type: String
+    Default: mockmate_user
+    Description: Master username for RDS PostgreSQL.
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9!#$%&*+\\-_=]+"
+    ConstraintDescription: Must be at least 8 characters and contain only valid alphanumeric and allowed punctuation characters.
+    Description: Master password for RDS PostgreSQL.
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues:
+      - db.t4g.micro
+      - db.t3.micro
+      - db.t4g.small
+      - db.t3.small
+    Description: RDS instance type (db.t4g.micro / db.t3.micro are Free-Tier eligible).
+
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 100
+    Description: Allocated storage in GB for RDS PostgreSQL (gp3).
+
+  BackendCpu:
+    Type: String
+    Default: "256"
+    AllowedValues: ["256", "512", "1024"]
+    Description: Fargate task CPU units for Backend (256 = 0.25 vCPU).
+
+  BackendMemory:
+    Type: String
+    Default: "512"
+    AllowedValues: ["512", "1024", "2048"]
+    Description: Fargate task Memory in MB for Backend.
+
+  FrontendCpu:
+    Type: String
+    Default: "256"
+    AllowedValues: ["256", "512", "1024"]
+    Description: Fargate task CPU units for Frontend (256 = 0.25 vCPU).
+
+  FrontendMemory:
+    Type: String
+    Default: "512"
+    AllowedValues: ["512", "1024", "2048"]
+    Description: Fargate task Memory in MB for Frontend.
+
+  BackendImageUri:
+    Type: String
+    Default: ""
+    Description: URI of the Backend Docker image in ECR. If blank, default ECR repo URI will be used.
+
+  FrontendImageUri:
+    Type: String
+    Default: ""
+    Description: URI of the Frontend Docker image in ECR. If blank, default ECR repo URI will be used.
+
+  JwtSecretKey:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Secret key used to sign JWT tokens (minimum 32 characters).
+
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional Google Gemini API Key for AI interview question generation.
+
+Conditions:
+  HasBackendImage: !Not [!Equals [!Ref BackendImageUri, ""]]
+  HasFrontendImage: !Not [!Equals [!Ref FrontendImageUri, ""]]
+
+Resources:
+  # ============================================================================
+  # NETWORKING: VPC, Subnets, Gateways, Routes
+  # ============================================================================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-vpc"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-igw"
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-subnet-1"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-subnet-2"
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-subnet-1"
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.12.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-subnet-2"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-rt"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-private-rt"
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ============================================================================
+  # SECURITY GROUPS (Least-Privilege Isolation)
+  # ============================================================================
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public Ingress for Application Load Balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-alb-sg"
+
+  ECSFargateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow inbound from ALB to ECS Fargate containers
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-ecs-fargate-sg"
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private PostgreSQL access restricted strictly to ECS Fargate tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref ECSFargateSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-rds-sg"
+
+  # ============================================================================
+  # AMAZON RDS (PostgreSQL Database)
+  # ============================================================================
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets for MockMate PostgreSQL database
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-dbsubnet-group"
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${EnvironmentName}-db"
+      Engine: postgres
+      EngineVersion: "16.3"
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      DBName: mockmate
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-db"
+
+  # ============================================================================
+  # SECRETS MANAGER (Secure Credential Storage)
+  # ============================================================================
+  AppSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvironmentName}-app-secrets"
+      Description: Secret credentials for MockMate Application
+      SecretString: !Sub |
+        {
+          "SECRET_KEY": "${JwtSecretKey}",
+          "GEMINI_API_KEY": "${GeminiApiKey}",
+          "DB_PASSWORD": "${DBPassword}"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-secrets"
+
+  # ============================================================================
+  # LOGGING & CONTAINER REGISTRY
+  # ============================================================================
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${EnvironmentName}-backend"
+      RetentionInDays: 14
+
+  FrontendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${EnvironmentName}-frontend"
+      RetentionInDays: 14
+
+  BackendECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${EnvironmentName}-backend"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only 5 latest images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  FrontendECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${EnvironmentName}-frontend"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only 5 latest images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  # ============================================================================
+  # IAM ROLES
+  # ============================================================================
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-execution-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SecretsAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref AppSecrets
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-task-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  # ============================================================================
+  # APPLICATION LOAD BALANCER & TARGET GROUPS
+  # ============================================================================
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${EnvironmentName}-alb"
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-alb"
+
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-backend-tg"
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /api/health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+
+  FrontendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-frontend-tg"
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+  BackendALBRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /api/*
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+
+  # ============================================================================
+  # ECS CLUSTER, TASK DEFINITIONS, AND SERVICES
+  # ============================================================================
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${EnvironmentName}-cluster"
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-cluster"
+
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${EnvironmentName}-backend-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref BackendCpu
+      Memory: !Ref BackendMemory
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: mockmate-backend
+          Image: !If
+            - HasBackendImage
+            - !Ref BackendImageUri
+            - !Sub "${BackendECRRepository.RepositoryUri}:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: ENVIRONMENT
+              Value: production
+            - Name: PORT
+              Value: "8000"
+            - Name: AUTO_MIGRATE_ON_STARTUP
+              Value: "true"
+            - Name: DATABASE_URL
+              Value: !Sub "postgresql://${DBUsername}:${DBPassword}@${RDSInstance.Endpoint.Address}:${RDSInstance.Endpoint.Port}/mockmate"
+            - Name: BACKEND_CORS_ORIGINS
+              Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+          Secrets:
+            - Name: SECRET_KEY
+              ValueFrom: !Sub "${AppSecrets}:SECRET_KEY::"
+            - Name: GEMINI_API_KEY
+              ValueFrom: !Sub "${AppSecrets}:GEMINI_API_KEY::"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BackendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: backend
+
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${EnvironmentName}-frontend-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref FrontendCpu
+      Memory: !Ref FrontendMemory
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: mockmate-frontend
+          Image: !If
+            - HasFrontendImage
+            - !Ref FrontendImageUri
+            - !Sub "${FrontendECRRepository.RepositoryUri}:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PORT
+              Value: "3000"
+            - Name: NEXT_PUBLIC_API_URL
+              Value: "/api"
+            - Name: BACKEND_URL
+              Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref FrontendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: frontend
+
+  BackendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - BackendALBRule
+      - RDSInstance
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-backend-service"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref BackendTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref ECSFargateSecurityGroup
+      LoadBalancers:
+        - ContainerName: mockmate-backend
+          ContainerPort: 8000
+          TargetGroupArn: !Ref BackendTargetGroup
+
+  FrontendService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - HTTPListener
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-frontend-service"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref FrontendTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref ECSFargateSecurityGroup
+      LoadBalancers:
+        - ContainerName: mockmate-frontend
+          ContainerPort: 3000
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS Name of the Application Load Balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${EnvironmentName}-ALB-DNS"
+
+  FrontendApplicationURL:
+    Description: Web URL for users to access MockMate
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+
+  BackendApiURL:
+    Description: Base URL for MockMate Backend API
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}/api"
+
+  BackendApiDocsURL:
+    Description: Interactive Swagger OpenAPI Documentation URL
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}/api/docs"
+
+  BackendHealthURL:
+    Description: Service Health Check Endpoint
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}/api/health"
+
+  RDSEndpointAddress:
+    Description: Private endpoint address of PostgreSQL RDS
+    Value: !GetAtt RDSInstance.Endpoint.Address
+
+  BackendECRRepositoryURI:
+    Description: ECR Repository URI for Backend images
+    Value: !GetAtt BackendECRRepository.RepositoryUri
+
+  FrontendECRRepositoryURI:
+    Description: ECR Repository URI for Frontend images
+    Value: !GetAtt FrontendECRRepository.RepositoryUri
+
+  SecretsManagerSecretArn:
+    Description: ARN of the AWS Secrets Manager Secret
+    Value: !Ref AppSecrets

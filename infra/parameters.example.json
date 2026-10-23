@@ -1,0 +1,54 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "mockmate-prod"
+  },
+  {
+    "ParameterKey": "DBUsername",
+    "ParameterValue": "mockmate_user"
+  },
+  {
+    "ParameterKey": "DBPassword",
+    "ParameterValue": "ReplaceWithSecurePassword123!"
+  },
+  {
+    "ParameterKey": "DBInstanceClass",
+    "ParameterValue": "db.t4g.micro"
+  },
+  {
+    "ParameterKey": "DBAllocatedStorage",
+    "ParameterValue": "20"
+  },
+  {
+    "ParameterKey": "BackendCpu",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "BackendMemory",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "FrontendCpu",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "FrontendMemory",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "BackendImageUri",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "FrontendImageUri",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "JwtSecretKey",
+    "ParameterValue": "replace-with-a-random-32-character-secret-key-for-jwt"
+  },
+  {
+    "ParameterKey": "GeminiApiKey",
+    "ParameterValue": ""
+  }
+]

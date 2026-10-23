@@ -53,14 +53,15 @@ class AIService:
             }
         }
 
-        # Preferred models in order of capability & speed
-        models_to_try = [self.model, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
+        # Preferred models in order of capability & speed (bound to at most 2 fast models)
+        models_to_try = [self.model, "gemini-2.0-flash", "gemini-1.5-flash"]
         unique_models = []
         for m in models_to_try:
             if m and m not in unique_models:
                 unique_models.append(m)
+        unique_models = unique_models[:2]
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=4.0) as client:
             for model_name in unique_models:
                 try:
                     target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
@@ -75,10 +76,18 @@ class AIService:
                     elif response.status_code in [401, 403]:
                         logger.info(f"Gemini API authentication issue ({response.status_code}); seamlessly switching to domain generator.")
                         break
+                    elif response.status_code == 429:
+                        logger.warning(f"Gemini API rate limit (429) hit; seamlessly switching to domain generator.")
+                        break
                     else:
                         logger.warning(f"Gemini API ({model_name}) returned status {response.status_code}: {response.text[:200]}")
+                        break
+                except httpx.TimeoutException:
+                    logger.warning(f"Gemini API ({model_name}) timed out after 4s; seamlessly switching to domain generator.")
+                    break
                 except Exception as e:
                     logger.warning(f"Gemini API ({model_name}) request failed: {e}")
+                    break
         return None
 
     async def generate_questions(
@@ -269,52 +278,74 @@ JSON Schema:
         Guarantees that:
         - Round 1 is Easy
         - Subsequent rounds progress toward Hard
-        - No duplicate questions are ever served
-        - Never gets stuck cycling through only 2 questions
+        - No duplicate questions are ever served within a session
+        - Recycles least-recently-asked bank questions across repeated sessions
+        - Never gets stuck cycling or hanging
         """
         effective_total = total_rounds or (start_round + count - 1)
         bank_map = get_fallback_bank_for_role(role, mode)
 
         exclude_list = [q.strip() for q in (exclude_questions or []) if q and q.strip()]
+        # Bounded sliding window of exclusions from the immediate recent tests
+        recent_exclusions = exclude_list[:max(count * 2, 10)]
+
         selected: List[Dict[str, Any]] = []
-        chosen_texts: List[str] = list(exclude_list)
+        session_chosen_texts: List[str] = []
 
         difficulty_order = ["Easy", "Easy to Medium", "Medium", "Medium to Hard", "Hard"]
+
+        # Flatten all domain bank questions for fallback search
+        all_domain_questions: List[Dict[str, Any]] = []
+        for diff_tier in difficulty_order:
+            all_domain_questions.extend(bank_map.get(diff_tier, []))
 
         for i in range(count):
             round_num = start_round + i
             target_diff = get_round_difficulty(round_num, effective_total)
 
-            # 1. Look for questions directly in the target difficulty tier
-            tier_candidates = list(bank_map.get(target_diff, []))
-            random.shuffle(tier_candidates)
             candidate = None
 
+            # 1. Search in target difficulty tier for questions not in session and not in recent exclusions
+            tier_candidates = [q for q in bank_map.get(target_diff, []) if q["question_text"] not in session_chosen_texts]
+            random.shuffle(tier_candidates)
             for q in tier_candidates:
-                q_text = q["question_text"]
-                if not is_duplicate_or_near_duplicate(q_text, chosen_texts):
+                if not is_duplicate_or_near_duplicate(q["question_text"], session_chosen_texts + recent_exclusions):
                     candidate = q
                     break
 
-            # 2. If all questions in that tier are used, search adjacent tiers in the same domain
+            # 2. If exhausted in target tier, search adjacent difficulty tiers in the same domain
             if not candidate:
-                all_domain_questions: List[Dict[str, Any]] = []
-                # Search nearest difficulty tiers first
-                for diff_tier in difficulty_order:
-                    all_domain_questions.extend(bank_map.get(diff_tier, []))
-                random.shuffle(all_domain_questions)
-
-                for q in all_domain_questions:
-                    q_text = q["question_text"]
-                    if not is_duplicate_or_near_duplicate(q_text, chosen_texts):
+                adjacent_candidates = [q for q in all_domain_questions if q["question_text"] not in session_chosen_texts]
+                random.shuffle(adjacent_candidates)
+                for q in adjacent_candidates:
+                    if not is_duplicate_or_near_duplicate(q["question_text"], session_chosen_texts + recent_exclusions):
                         candidate = q
                         break
 
-            # 3. If the entire domain bank was exhausted across all previous sessions, generate a distinct dynamic variant
-            if not candidate:
-                candidate = self._generate_dynamic_domain_fallback(role, target_diff, mode, round_num, chosen_texts)
+            # 3. If all bank questions have been used recently, recycle bank questions not used in the CURRENT session
+            #    prioritizing the Least-Recently-Used questions (those furthest back in exclude_list or not in exclude_list)
+            if not candidate and all_domain_questions:
+                unpicked_in_session = [q for q in all_domain_questions if q["question_text"] not in session_chosen_texts]
+                if unpicked_in_session:
+                    def lru_key(q_item: Dict[str, Any]) -> int:
+                        txt = q_item["question_text"]
+                        try:
+                            return exclude_list.index(txt)  # higher index = used longer ago in exclude_list
+                        except ValueError:
+                            return 999999
+                    unpicked_in_session.sort(key=lru_key, reverse=True)
+                    for q in unpicked_in_session:
+                        if not is_duplicate_or_near_duplicate(q["question_text"], session_chosen_texts):
+                            candidate = q
+                            break
 
-            chosen_texts.append(candidate["question_text"])
+            # 4. If bank is empty (or custom domain), generate a distinct dynamic domain fallback
+            if not candidate:
+                candidate = self._generate_dynamic_domain_fallback(
+                    role, target_diff, mode, round_num, session_chosen_texts + recent_exclusions
+                )
+
+            session_chosen_texts.append(candidate["question_text"])
 
             if mode == "mcq" and candidate.get("options"):
                 shuffled_opts, shuffled_key = shuffle_mcq_options(
@@ -356,27 +387,133 @@ JSON Schema:
         even if an interview exceeds the pre-stored question bank size.
         """
         topics = get_topics_for_role(role)
-        chosen_topic = topics[(round_num - 1) % len(topics)]
-        seed_id = len(seen_texts) + 1
+        seed_offset = len(seen_texts)
+
+        # 8 distinct real-world technical scenario archetypes
+        archetypes = [
+            (
+                "When designing an enterprise production architecture for {topic} in {role}, which implementation strategy best ensures modularity and fault isolation?",
+                "Decouple state and logic via explicit interfaces, strict contracts, and granular error boundaries for {topic}",
+                "Combine all business logic and persistence logic into a single monolithic global singleton",
+                "Bypass schema validation and runtime sanity checks to maximize unthrottled throughput",
+                "Hardcode external endpoints and credentials directly inside domain handler functions"
+            ),
+            (
+                "In high-concurrency {role} services, how should engineers mitigate latency spikes and resource contention related to {topic}?",
+                "Implement asynchronous non-blocking processing, connection pooling, and bounded telemetry-driven caching for {topic}",
+                "Allocate unbounded thread pools and disable backpressure to swallow incoming traffic bursts",
+                "Disable structured audit logs and performance metrics during high traffic windows",
+                "Block the main event thread synchronously until each third-party dependency for {topic} responds"
+            ),
+            (
+                "Which engineering practice is essential when writing automated regression tests for {topic} as a {role}?",
+                "Mock external network dependencies at boundaries and assert deterministic state transitions and error paths for {topic}",
+                "Run test suites directly against mutating production data without transactional rollback isolation",
+                "Insert arbitrary sleep delays rather than relying on deterministic event signals or completion promises",
+                "Disable all assertion checks in CI so test pipelines pass unconditionally under load"
+            ),
+            (
+                "When securing sensitive endpoints and workflows involving {topic} in a {role} system, which control is most critical?",
+                "Enforce role-based access control, cryptographic verification, and strict input sanitization at ingress for {topic}",
+                "Rely solely on client-side frontend validation without backend verification",
+                "Transmit sensitive tokens and secrets within cleartext URL query parameters",
+                "Disable CORS and authentication headers to simplify internal microservice communication"
+            ),
+            (
+                "How should a {role} approach database persistence, queries, and index optimization for {topic} under heavy write load?",
+                "Analyze query execution plans (EXPLAIN), optimize index cardinality, and leverage write-ahead batches for {topic}",
+                "Add indexes on every single column regardless of cardinality or write overhead",
+                "Execute full table scans inside loops rather than batching relational operations",
+                "Disable database foreign key integrity and transactional ACID constraints permanently"
+            ),
+            (
+                "In a distributed {role} environment, how should systems handle transient network partitions or downstream outages affecting {topic}?",
+                "Employ circuit breaker patterns with exponential backoff jitter and graceful fallback degradation for {topic}",
+                "Retry failed requests in a tight synchronous infinite loop with zero backoff",
+                "Immediately crash the application worker process upon the first transient network timeout",
+                "Silently drop incoming client requests without returning an appropriate HTTP error status code"
+            ),
+            (
+                "Which observability strategy provides the most actionable insight for diagnosing production anomalies in {topic} for a {role}?",
+                "Correlate structured JSON logs, OpenTelemetry distributed traces, and RED/USE metrics for {topic}",
+                "Rely strictly on unstructured console print statements scattered across business logic",
+                "Sample only 0.001% of error events to conserve disk space during operational outages",
+                "Disable health check endpoints and alert triggers to reduce on-call alert noise"
+            ),
+            (
+                "When refactoring legacy code for {topic} into a modern {role} service, which approach best preserves backward compatibility?",
+                "Introduce semantic API versioning, contract testing, and deprecated feature flags with gradual migration paths for {topic}",
+                "Change public method signatures and payloads abruptly without migration notices",
+                "Delete legacy test suites to avoid updating outdated assertion expectations",
+                "Rewrite the entire persistence layer in an untested experimental framework in a single deploy"
+            ),
+        ]
+
+        # Search for a candidate variant that is not a duplicate
+        for attempt in range(len(archetypes) * 2):
+            topic_idx = (round_num - 1 + attempt // len(archetypes) + seed_offset) % len(topics)
+            chosen_topic = topics[topic_idx]
+            arch_idx = (round_num + seed_offset + attempt) % len(archetypes)
+            q_template, opt_a_tmpl, opt_b_tmpl, opt_c_tmpl, opt_d_tmpl = archetypes[arch_idx]
+
+            q_text = q_template.format(topic=chosen_topic, role=role)
+            if not is_duplicate_or_near_duplicate(q_text, seen_texts):
+                opt_a = opt_a_tmpl.format(topic=chosen_topic, role=role)
+                opt_b = opt_b_tmpl.format(topic=chosen_topic, role=role)
+                opt_c = opt_c_tmpl.format(topic=chosen_topic, role=role)
+                opt_d = opt_d_tmpl.format(topic=chosen_topic, role=role)
+
+                if mode == "mcq":
+                    raw_options = [
+                        {"key": "A", "text": opt_a},
+                        {"key": "B", "text": opt_b},
+                        {"key": "C", "text": opt_c},
+                        {"key": "D", "text": opt_d}
+                    ]
+                    shuffled_opts, shuffled_key = shuffle_mcq_options(raw_options, "A")
+                    return {
+                        "question_text": q_text,
+                        "topic": chosen_topic,
+                        "options": shuffled_opts,
+                        "correct_option": shuffled_key,
+                        "explanation": f"In production {role} engineering, {chosen_topic} demands {opt_a.lower()}."
+                    }
+                else:
+                    return {
+                        "question_text": f"Explain the architectural trade-offs, practical implementation patterns, and error handling strategies for {chosen_topic} in a production {role} environment.",
+                        "topic": chosen_topic,
+                        "model_answer": f"When implementing {chosen_topic} for a {role} system, engineers must account for performance, failure modes, monitoring, and modularity. Production solutions decouple implementation details through interfaces, enforce strict typing and error logging, and measure latency and throughput under peak load."
+                    }
+
+        # Fallback if all archetypes matched (append round seed to guarantee novelty)
+        topic_idx = (round_num - 1) % len(topics)
+        chosen_topic = topics[topic_idx]
+        arch_idx = round_num % len(archetypes)
+        q_template, opt_a_tmpl, opt_b_tmpl, opt_c_tmpl, opt_d_tmpl = archetypes[arch_idx]
+        q_text = f"{q_template.format(topic=chosen_topic, role=role)} (Evaluation Case #{seed_offset + round_num})"
+        opt_a = opt_a_tmpl.format(topic=chosen_topic, role=role)
+        opt_b = opt_b_tmpl.format(topic=chosen_topic, role=role)
+        opt_c = opt_c_tmpl.format(topic=chosen_topic, role=role)
+        opt_d = opt_d_tmpl.format(topic=chosen_topic, role=role)
 
         if mode == "mcq":
             raw_options = [
-                {"key": "A", "text": f"By isolating {chosen_topic} responsibilities using clear architectural abstractions"},
-                {"key": "B", "text": "By hardcoding global mutable variables across all modules"},
-                {"key": "C", "text": "By bypassing runtime validation and error handlers"},
-                {"key": "D", "text": "By duplicating code routines across separate processes"}
+                {"key": "A", "text": opt_a},
+                {"key": "B", "text": opt_b},
+                {"key": "C", "text": opt_c},
+                {"key": "D", "text": opt_d}
             ]
             shuffled_opts, shuffled_key = shuffle_mcq_options(raw_options, "A")
             return {
-                "question_text": f"In {role} engineering, how is {chosen_topic} primarily implemented to optimize system maintainability and performance (Scenario #{seed_id})?",
+                "question_text": q_text,
                 "topic": chosen_topic,
                 "options": shuffled_opts,
                 "correct_option": shuffled_key,
-                "explanation": f"In production {role} systems, {chosen_topic} is implemented through modular abstractions and separation of concerns to ensure maintainability."
+                "explanation": f"In production {role} engineering, {chosen_topic} demands {opt_a.lower()}."
             }
         else:
             return {
-                "question_text": f"Explain the architectural trade-offs, practical implementation patterns, and error handling strategies for {chosen_topic} in a production {role} environment (Scenario #{seed_id}).",
+                "question_text": f"Explain the architectural trade-offs, practical implementation patterns, and error handling strategies for {chosen_topic} in a production {role} environment (Case #{seed_offset + round_num}).",
                 "topic": chosen_topic,
                 "model_answer": f"When implementing {chosen_topic} for a {role} system, engineers must account for performance, failure modes, monitoring, and modularity. Production solutions decouple implementation details through interfaces, enforce strict typing and error logging, and measure latency and throughput under peak load."
             }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
@@ -22,29 +22,51 @@ export default function BookmarksPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchBookmarks();
-  }, []);
-
-  const fetchBookmarks = async () => {
+  const fetchBookmarks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await apiRequest<BookmarkItem[]>("/bookmarks");
       setBookmarks(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load saved questions.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load saved questions.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    apiRequest<BookmarkItem[]>("/bookmarks")
+      .then((data) => {
+        if (!ignore) {
+          setBookmarks(data);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load saved questions.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleRemove = async (questionId: number) => {
     try {
       await apiRequest(`/bookmarks/${questionId}`, { method: "DELETE" });
       setBookmarks((prev) => prev.filter((b) => b.question_id !== questionId));
-    } catch (err: any) {
-      alert(err.message || "Failed to remove saved question.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to remove saved question.";
+      alert(msg);
     }
   };
 

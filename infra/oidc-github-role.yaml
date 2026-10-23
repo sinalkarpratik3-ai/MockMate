@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  GitHub Actions OIDC Provider and Least-Privilege Deployment Role for MockMate.
+  Enables GitHub Actions to securely deploy MockMate to AWS without static access keys.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: sinalkarpratik3-ai
+    Description: GitHub username or organization owning the repository.
+
+  RepositoryName:
+    Type: String
+    Default: MockMate
+    Description: GitHub repository name.
+
+  BranchName:
+    Type: String
+    Default: main
+    Description: Git branch authorized to deploy (e.g. main).
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c587612c6c5f37fa7477d8a53d61a87ec0fc298
+
+  GitHubActionsDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MockMate-GitHubActions-DeployRole
+      Description: IAM Role assumed by GitHub Actions to deploy MockMate via OIDC
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${RepositoryName}:ref:refs/heads/${BranchName}"
+      Policies:
+        - PolicyName: MockMateDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # 1. CloudFormation Stack Management
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:DeleteStack
+                Resource:
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/mockmate-prod/*"
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/mockmate-*/*"
+
+              # 2. Amazon ECR Image Push & Authentication
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeRepositories
+                  - ecr:CreateRepository
+                  - ecr:DeleteRepository
+                  - ecr:SetRepositoryPolicy
+                  - ecr:PutLifecyclePolicy
+                Resource: !Sub "arn:aws:ecr:*:${AWS::AccountId}:repository/mockmate-*"
+
+              # 3. Amazon ECS Deployment Updates
+              - Effect: Allow
+                Action:
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                  - ecs:DescribeTaskDefinition
+                  - ecs:CreateCluster
+                  - ecs:DescribeClusters
+                  - ecs:DeleteCluster
+                  - ecs:CreateService
+                  - ecs:UpdateService
+                  - ecs:DescribeServices
+                  - ecs:DeleteService
+                  - ecs:TagResource
+                Resource: "*"
+
+              # 4. IAM PassRole for ECS Task & Execution Roles
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/mockmate-*"
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ecs-tasks.amazonaws.com
+
+              # 5. IAM Role Creation & Management for CloudFormation Stack
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:GetRole
+                  - iam:DeleteRole
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:TagRole
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/mockmate-*"
+
+              # 6. AWS Secrets Manager Management
+              - Effect: Allow
+                Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:TagResource
+                Resource: !Sub "arn:aws:secretsmanager:*:${AWS::AccountId}:secret:mockmate-*"
+
+              # 7. CloudWatch Logs Management
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/ecs/mockmate-*"
+
+              # 8. Infrastructure Provisioning (VPC, Subnets, Security Groups, ALB, RDS)
+              - Effect: Allow
+                Action:
+                  - ec2:*Vpc*
+                  - ec2:*Subnet*
+                  - ec2:*RouteTable*
+                  - ec2:*Route*
+                  - ec2:*InternetGateway*
+                  - ec2:*SecurityGroup*
+                  - ec2:Describe*
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                  - rds:*
+                  - elasticloadbalancing:*
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: ARN of the GitHub Actions OIDC Deploy Role (copy this to GitHub Secret AWS_ROLE_ARN)
+    Value: !GetAtt GitHubActionsDeployRole.Arn
+    Export:
+      Name: MockMate-GitHubActions-RoleArn
+
+  OIDCProviderArn:
+    Description: ARN of the GitHub OIDC Provider
+    Value: !GetAtt GitHubOIDCProvider.Arn

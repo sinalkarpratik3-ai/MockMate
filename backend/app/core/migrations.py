@@ -5,7 +5,7 @@ Safely and idempotently migrates PostgreSQL datetime columns from
 TIMESTAMP WITHOUT TIME ZONE to TIMESTAMP WITH TIME ZONE.
 
 Preserves existing records by interpreting naive timestamps as UTC.
-Compatible with both fresh Render Blueprint deployments and existing PostgreSQL databases.
+Compatible with fresh AWS RDS deployments and existing PostgreSQL databases.
 """
 
 import asyncio

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
-import { Interview, Answer } from "@/types";
+import { Interview, Answer, BookmarkItem } from "@/types";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -14,8 +14,8 @@ import {
   LayoutDashboard, 
   BookOpen, 
   AlertCircle, 
-  Loader2,
-  Check,
+  Loader2, 
+  Check, 
   RotateCcw
 } from "lucide-react";
 
@@ -32,32 +32,40 @@ function InterviewResultsContent() {
   const [savingBookmarkId, setSavingBookmarkId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchResults();
-    fetchUserBookmarks();
+    let ignore = false;
+    apiRequest<Interview>(`/interviews/${interviewId}/results`)
+      .then((data) => {
+        if (!ignore) {
+          setInterview(data);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load practice results.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+
+    apiRequest<BookmarkItem[]>("/bookmarks")
+      .then((bms) => {
+        if (!ignore) {
+          const ids = new Set<number>(bms.map((b) => b.question_id));
+          setBookmarkedIds(ids);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch existing bookmarks:", err);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [interviewId]);
-
-  const fetchResults = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiRequest<Interview>(`/interviews/${interviewId}/results`);
-      setInterview(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load practice results.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUserBookmarks = async () => {
-    try {
-      const bms = await apiRequest<any[]>("/bookmarks");
-      const ids = new Set<number>(bms.map((b) => b.question_id));
-      setBookmarkedIds(ids);
-    } catch (err) {
-      console.warn("Could not fetch existing bookmarks:", err);
-    }
-  };
 
   const handleToggleBookmark = async (questionId: number) => {
     setSavingBookmarkId(questionId);
@@ -75,8 +83,9 @@ function InterviewResultsContent() {
         await apiRequest(`/bookmarks/${questionId}`, { method: "POST" });
         setBookmarkedIds((prev) => new Set(prev).add(questionId));
       }
-    } catch (err: any) {
-      alert(err.message || "Bookmark action failed.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Bookmark action failed.";
+      alert(msg);
     } finally {
       setSavingBookmarkId(null);
     }

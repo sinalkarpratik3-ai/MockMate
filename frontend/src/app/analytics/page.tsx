@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
@@ -18,22 +18,43 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await apiRequest<DashboardSummary>("/dashboard");
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load progress metrics.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load progress metrics.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    apiRequest<DashboardSummary>("/dashboard")
+      .then((res) => {
+        if (!ignore) {
+          setData(res);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load progress metrics.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   return (
     <AppLayout>

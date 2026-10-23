@@ -1,23 +1,56 @@
+export interface ErrorDetailItem {
+  loc?: (string | number)[];
+  msg?: string;
+  type?: string;
+}
+
+export interface ErrorResponseBody {
+  detail?: string | ErrorDetailItem[] | Record<string, unknown>;
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 export class ApiError extends Error {
   status: number;
-  data: any;
+  data: unknown;
 
-  constructor(status: number, message: string, data?: any) {
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.status = status;
     this.data = data;
+    this.name = "ApiError";
   }
 }
 
+/**
+ * Normalizes any backend URL or path into a canonical API base URL ending with '/api'
+ * without duplicate prefixes or trailing slashes.
+ */
 export function normalizeApiUrl(rawUrl: string): string {
   let trimmed = rawUrl.trim().replace(/\/+$/, "");
   if (!trimmed) return "";
+
+  // Relative path (e.g. "/api" or "/custom-api")
+  if (trimmed.startsWith("/")) {
+    return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+  }
+
+  // Ensure valid HTTP/HTTPS protocol
   if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
     trimmed = `https://${trimmed}`;
   }
+
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 }
 
+/**
+ * Resolves the backend API base URL with priority:
+ * 1. Explicit NEXT_PUBLIC_API_URL environment variable (if non-localhost on remote host)
+ * 2. Remote browser (e.g. behind AWS ALB with path-based routing): relative '/api'
+ * 3. Localhost browser development: 'http://localhost:8000/api'
+ * 4. Server-side Next.js runtime fallback: BACKEND_INTERNAL_URL or 'http://localhost:8000/api'
+ */
 export function getApiBaseUrl(): string {
   const isBrowser = typeof window !== "undefined";
   const isRemoteBrowser =
@@ -25,18 +58,8 @@ export function getApiBaseUrl(): string {
     window.location.hostname !== "localhost" &&
     window.location.hostname !== "127.0.0.1";
 
-  // 1. Runtime script variable injected by RootLayout SSR inside container
-  if (isBrowser && (window as any).__MOCKMATE_API_URL__) {
-    const runtimeUrl = String((window as any).__MOCKMATE_API_URL__).trim();
-    if (runtimeUrl.length > 0) {
-      if (!isRemoteBrowser || (!runtimeUrl.includes("localhost") && !runtimeUrl.includes("127.0.0.1"))) {
-        return normalizeApiUrl(runtimeUrl);
-      }
-    }
-  }
-
-  // 2. Build-time environment variable
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL;
+  // 1. Explicit environment variable
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl && envUrl.trim().length > 0) {
     const trimmed = envUrl.trim();
     if (!isRemoteBrowser || (!trimmed.includes("localhost") && !trimmed.includes("127.0.0.1"))) {
@@ -44,43 +67,68 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 3. Remote browser fallback: use same-origin /api proxied by Next.js server rewrites
+  // 2. Remote browser fallback: use same-origin relative '/api' routed by AWS ALB
   if (isRemoteBrowser) {
-    return `${window.location.origin}/api`;
+    return "/api";
   }
 
-  // 4. Default to localhost for local development
+  // 3. Local browser development: direct to local backend port 8000
+  if (isBrowser) {
+    return "http://localhost:8000/api";
+  }
+
+  // 4. Server-side Next.js runtime fallback
+  const serverBackend = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_URL;
+  if (serverBackend && serverBackend.trim().length > 0) {
+    return normalizeApiUrl(serverBackend);
+  }
+
   return "http://localhost:8000/api";
 }
 
-export function extractErrorMessage(data: any, status: number): string {
+/**
+ * Normalizes an API endpoint to ensure no duplicate '/api' prefix
+ */
+export function normalizeEndpoint(endpoint: string): string {
+  // Strip any leading slashes and optional leading 'api/'
+  const cleaned = endpoint.trim().replace(/^\/+/, "").replace(/^api\/?/i, "");
+  return `/${cleaned}`;
+}
+
+export function extractErrorMessage(data: unknown, status: number): string {
   if (!data) return `HTTP ${status} Request failed`;
   if (typeof data === "string") return data;
-  if (typeof data.detail === "string") return data.detail;
-  if (Array.isArray(data.detail)) {
-    const messages = data.detail
-      .map((item: any) => {
-        if (typeof item === "string") return item;
-        if (item && typeof item.msg === "string") {
-          const field =
-            Array.isArray(item.loc) && item.loc.length > 1
-              ? `${item.loc[item.loc.length - 1]}: `
-              : "";
-          return `${field}${item.msg}`;
-        }
-        return JSON.stringify(item);
-      })
-      .filter(Boolean);
-    if (messages.length > 0) {
-      return messages.join("; ");
+  
+  if (typeof data === "object" && data !== null) {
+    const obj = data as ErrorResponseBody;
+    if (typeof obj.detail === "string") return obj.detail;
+    if (Array.isArray(obj.detail)) {
+      const messages = obj.detail
+        .map((item: unknown) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object") {
+            const detailItem = item as ErrorDetailItem;
+            const field =
+              Array.isArray(detailItem.loc) && detailItem.loc.length > 1
+                ? `${detailItem.loc[detailItem.loc.length - 1]}: `
+                : "";
+            return `${field}${detailItem.msg || JSON.stringify(item)}`;
+          }
+          return String(item);
+        })
+        .filter(Boolean);
+      if (messages.length > 0) {
+        return messages.join("; ");
+      }
     }
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error === "string") return obj.error;
   }
-  if (typeof data.message === "string") return data.message;
-  if (typeof data.error === "string") return data.error;
+
   return `HTTP ${status} Request failed`;
 }
 
-export async function apiRequest<T = any>(
+export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -95,12 +143,12 @@ export async function apiRequest<T = any>(
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const baseUrl = getApiBaseUrl();
-  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+  const cleanEndpoint = normalizeEndpoint(endpoint);
   const url = `${baseUrl}${cleanEndpoint}`;
 
   const controller = new AbortController();
-  const timeoutMs = 20000;
+  const timeoutMs = 30000;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const signal = options.signal || controller.signal;
 
@@ -115,7 +163,7 @@ export async function apiRequest<T = any>(
       return {} as T;
     }
 
-    const data = await response.json().catch(() => ({}));
+    const data: unknown = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       const errorMsg = extractErrorMessage(data, response.status);
@@ -123,16 +171,21 @@ export async function apiRequest<T = any>(
     }
 
     return data as T;
-  } catch (error: any) {
-    if (error?.name === "AbortError") {
-      throw new ApiError(408, `Connection timed out reaching ${url}. On Render free tier, services may take ~30–50s to wake up. Please retry.`);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError(
+        408,
+        `Connection timed out reaching ${url}. The server took longer than 30 seconds to respond. Please verify that the backend is running and reachable, then retry.`
+      );
     }
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, error.message || "Network connection error");
+    const message = error instanceof Error ? error.message : "Network connection error";
+    throw new ApiError(500, message);
   } finally {
     clearTimeout(timeoutId);
   }
 }
+
 

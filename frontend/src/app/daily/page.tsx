@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
 import { DailyQuestion } from "@/types";
@@ -26,11 +26,7 @@ export default function DailyQuestionPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [savingBookmark, setSavingBookmark] = useState(false);
 
-  useEffect(() => {
-    fetchDailyQuestion();
-  }, []);
-
-  const fetchDailyQuestion = async () => {
+  const fetchDailyQuestion = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -44,12 +40,45 @@ export default function DailyQuestionPage() {
           setTextAnswer(res.user_attempt.submitted_answer);
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load today's question.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load today's question.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    apiRequest<DailyQuestion>("/daily")
+      .then((res) => {
+        if (!ignore) {
+          setData(res);
+          setIsBookmarked(Boolean(res.is_bookmarked));
+          if (res.user_attempt) {
+            if (res.question_type === "mcq") {
+              setSelectedOption(res.user_attempt.submitted_answer);
+            } else {
+              setTextAnswer(res.user_attempt.submitted_answer);
+            }
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load today's question.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleToggleBookmark = async () => {
     if (!data?.question_id) return;
@@ -62,8 +91,9 @@ export default function DailyQuestionPage() {
         await apiRequest(`/bookmarks/${data.question_id}`, { method: "POST" });
         setIsBookmarked(true);
       }
-    } catch (err: any) {
-      alert(err.message || "Failed to toggle bookmark.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to toggle bookmark.";
+      alert(msg);
     } finally {
       setSavingBookmark(false);
     }
@@ -80,7 +110,7 @@ export default function DailyQuestionPage() {
 
     setSubmitting(true);
     try {
-      const res = await apiRequest<any>("/daily/attempt", {
+      const res = await apiRequest<NonNullable<DailyQuestion["user_attempt"]>>("/daily/attempt", {
         method: "POST",
         body: JSON.stringify({ submitted_answer: answerToSubmit }),
       });
@@ -90,8 +120,9 @@ export default function DailyQuestionPage() {
         has_attempted: true,
         user_attempt: res,
       } : null);
-    } catch (err: any) {
-      alert(err.message || "Submission failed.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Submission failed.";
+      alert(msg);
     } finally {
       setSubmitting(false);
     }

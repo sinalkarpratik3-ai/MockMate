@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/AppLayout";
 import { apiRequest } from "@/lib/api";
@@ -19,22 +19,43 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [modeFilter, setModeFilter] = useState<"all" | "mcq" | "text">("all");
 
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await apiRequest<Interview[]>("/interviews");
       setInterviews(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load practice history.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load practice history.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    apiRequest<Interview[]>("/interviews")
+      .then((data) => {
+        if (!ignore) {
+          setInterviews(data);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : "Failed to load practice history.";
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const filteredInterviews = interviews.filter((itv) => {
     if (modeFilter === "all") return true;

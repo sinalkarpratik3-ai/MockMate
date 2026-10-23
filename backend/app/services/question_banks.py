@@ -139,13 +139,15 @@ def is_duplicate_or_near_duplicate(
 
         if min_tokens > 0:
             overlap = len(intersection) / min_tokens
-            # If at least 70% of the shorter question's content words are shared
-            if overlap >= 0.70 and len(intersection) >= 3:
+            # If at least 80% of the shorter question's content words are shared with at least 5 intersecting tokens
+            if overlap >= 0.80 and len(intersection) >= 5:
                 return True
 
-        # Substring containment for long questions
-        if len(cand_norm) > 25 and len(ex_norm) > 25:
-            if cand_norm in ex_norm or ex_norm in cand_norm:
+        # Substring containment only if the shorter question constitutes >= 85% of the longer question
+        if len(cand_norm) > 30 and len(ex_norm) > 30:
+            shorter_len = min(len(cand_norm), len(ex_norm))
+            longer_len = max(len(cand_norm), len(ex_norm))
+            if (cand_norm in ex_norm or ex_norm in cand_norm) and (shorter_len / longer_len >= 0.85):
                 return True
 
     return False
@@ -337,6 +339,54 @@ FALLBACK_MCQ_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 ],
                 "correct_option": "A",
                 "explanation": "Calling len() on any empty container in Python (including dicts, lists, and sets) returns 0."
+            },
+            {
+                "question_text": "How does accessing a dictionary key using `dict.get('key', default)` differ from `dict['key']`?",
+                "topic": "Python Data Types & Collections",
+                "options": [
+                    {"key": "A", "text": "`dict.get()` returns the default value if the key is missing, while `dict['key']` raises a `KeyError`"},
+                    {"key": "B", "text": "`dict['key']` automatically inserts the missing key with None"},
+                    {"key": "C", "text": "`dict.get()` deletes the key after reading it"},
+                    {"key": "D", "text": "`dict.get()` is only valid for integer keys"}
+                ],
+                "correct_option": "A",
+                "explanation": "`dict.get(key, default)` safely retrieves the value or returns default (or None) without raising KeyError when the key does not exist."
+            },
+            {
+                "question_text": "What does the slice expression `text[1:5]` return given `text = 'PYTHON'`?",
+                "topic": "Python Data Types & Collections",
+                "options": [
+                    {"key": "A", "text": "'YTHO'"},
+                    {"key": "B", "text": "'PYTH'"},
+                    {"key": "C", "text": "'YTHON'"},
+                    {"key": "D", "text": "'PYTHON'"}
+                ],
+                "correct_option": "A",
+                "explanation": "Slicing is zero-indexed and exclusive of the end index: index 1 is 'Y', index 4 is 'O', yielding 'YTHO'."
+            },
+            {
+                "question_text": "What is the key difference between `list.append(x)` and `list.extend(x)` in Python?",
+                "topic": "Python Data Types & Collections",
+                "options": [
+                    {"key": "A", "text": "`append` adds `x` as a single element, while `extend` iterates over `x` and adds each of its items"},
+                    {"key": "B", "text": "`extend` can only be called on tuples"},
+                    {"key": "C", "text": "`append` creates a new list copy, while `extend` operates in-place"},
+                    {"key": "D", "text": "`extend` sorts the list automatically after insertion"}
+                ],
+                "correct_option": "A",
+                "explanation": "`append(x)` adds object `x` directly to the end of the list as one element. `extend(iterable)` iterates through the argument, appending each item individually."
+            },
+            {
+                "question_text": "In a Python `if` statement, how do empty containers like `[]`, `{}`, and `''` evaluate?",
+                "topic": "Python Data Types & Collections",
+                "options": [
+                    {"key": "A", "text": "They evaluate to `False` in a boolean context"},
+                    {"key": "B", "text": "They raise an `EmptyContainerException`"},
+                    {"key": "C", "text": "They evaluate to `True` because the container object exists"},
+                    {"key": "D", "text": "They evaluate to `None`"}
+                ],
+                "correct_option": "A",
+                "explanation": "In Python's truth-value testing, empty sequences and collections (`[]`, `{}`, `set()`, `''`, `()`, `0`) evaluate to `False`."
             }
         ],
         "Easy to Medium": [
@@ -363,6 +413,42 @@ FALLBACK_MCQ_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 ],
                 "correct_option": "A",
                 "explanation": "Python's context management protocol requires the __enter__() and __exit__() dunder methods."
+            },
+            {
+                "question_text": "What is the purpose of `*args` and `**kwargs` in a Python function definition?",
+                "topic": "Functions & Variable Scope",
+                "options": [
+                    {"key": "A", "text": "`*args` collects positional arguments into a tuple, while `**kwargs` collects keyword arguments into a dictionary"},
+                    {"key": "B", "text": "`*args` enforces static typing, while `**kwargs` allows global variable access"},
+                    {"key": "C", "text": "`*args` compiles the function to C bytecode"},
+                    {"key": "D", "text": "`**kwargs` is required for all recursive function definitions"}
+                ],
+                "correct_option": "A",
+                "explanation": "`*args` enables a function to accept any number of positional arguments unpacked into a tuple, and `**kwargs` accepts arbitrary keyword arguments as a dictionary."
+            },
+            {
+                "question_text": "What does Python's built-in `enumerate(iterable, start=0)` function yield on each iteration?",
+                "topic": "Python Data Types & Collections",
+                "options": [
+                    {"key": "A", "text": "A tuple containing `(current_index, item)`"},
+                    {"key": "B", "text": "Only the integer index of the item"},
+                    {"key": "C", "text": "A reversed copy of the iterable"},
+                    {"key": "D", "text": "A dictionary mapping all keys to values"}
+                ],
+                "correct_option": "A",
+                "explanation": "`enumerate()` takes an iterable and returns an enumerate object that yields pairs of `(count, value)` on each iteration."
+            },
+            {
+                "question_text": "In a `try...except...else...finally` block, when does the `else` clause execute?",
+                "topic": "Error Handling & Debugging",
+                "options": [
+                    {"key": "A", "text": "Only when the `try` block completes without raising any exception"},
+                    {"key": "B", "text": "Whenever an unhandled exception occurs"},
+                    {"key": "C", "text": "Always immediately before the `finally` block"},
+                    {"key": "D", "text": "Only when the `finally` block raises an error"}
+                ],
+                "correct_option": "A",
+                "explanation": "The `else` clause in exception handling runs if and only if the code in the `try` clause did not raise an exception."
             }
         ],
         "Medium": [
@@ -389,6 +475,42 @@ FALLBACK_MCQ_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 ],
                 "correct_option": "A",
                 "explanation": "Default parameter values are instantiated when the function is defined, sharing the exact same object instance across every call that relies on the default."
+            },
+            {
+                "question_text": "What is the difference between `copy.copy()` (shallow copy) and `copy.deepcopy()` in Python?",
+                "topic": "Memory Management & Reference Counting",
+                "options": [
+                    {"key": "A", "text": "Shallow copy creates a new container but inserts references to the original child objects; deep copy recursively copies child objects"},
+                    {"key": "B", "text": "Shallow copy only works on primitive types, while deep copy converts objects into JSON strings"},
+                    {"key": "C", "text": "Deep copy deletes the original object from RAM after copying"},
+                    {"key": "D", "text": "Shallow copy creates thread-safe locks around attributes"}
+                ],
+                "correct_option": "A",
+                "explanation": "A shallow copy constructs a new collection object and populates it with references to child items. A deep copy recursively duplicates every object found within the original hierarchy."
+            },
+            {
+                "question_text": "Why should `@functools.wraps(func)` be used when implementing a custom Python decorator?",
+                "topic": "Decorators & Generators",
+                "options": [
+                    {"key": "A", "text": "It preserves the original function's docstring, name, module, and signature on the wrapper"},
+                    {"key": "B", "text": "It compiles the decorator wrapper into native C machine code"},
+                    {"key": "C", "text": "It forces the decorated function to run in a background daemon thread"},
+                    {"key": "D", "text": "It bypasses Python's maximum recursion limit"}
+                ],
+                "correct_option": "A",
+                "explanation": "`functools.wraps` copies metadata (such as `__name__`, `__doc__`, and `__annotations__`) from the decorated function onto the wrapper function, preventing introspection breakdown."
+            },
+            {
+                "question_text": "What is the primary advantage of using `isinstance(obj, Class)` over `type(obj) is Class` for type checking?",
+                "topic": "Object-Oriented Python",
+                "options": [
+                    {"key": "A", "text": "`isinstance()` correctly considers subclass inheritance, whereas `type() is` only checks exact class identity"},
+                    {"key": "B", "text": "`isinstance()` executes twice as fast as `type()`"},
+                    {"key": "C", "text": "`type() is` fails if the object has more than two attributes"},
+                    {"key": "D", "text": "`isinstance()` converts instances to dictionaries"}
+                ],
+                "correct_option": "A",
+                "explanation": "`isinstance()` supports inheritance hierarchies by returning True if `obj` is an instance of `Class` or any subclass derived from it."
             }
         ],
         "Medium to Hard": [
@@ -415,6 +537,30 @@ FALLBACK_MCQ_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 ],
                 "correct_option": "A",
                 "explanation": "Defining __slots__ allocates space for a fixed tuple of attributes rather than creating a dynamic __dict__ for every object, dramatically reducing memory overhead."
+            },
+            {
+                "question_text": "In Python's `asyncio` framework, what occurs when an `await` expression is reached inside a coroutine?",
+                "topic": "Asynchronous Programming (asyncio)",
+                "options": [
+                    {"key": "A", "text": "Execution of that coroutine suspends, yielding control back to the event loop to run other scheduled tasks"},
+                    {"key": "B", "text": "A new OS thread is spawned to run the awaited target synchronously"},
+                    {"key": "C", "text": "The entire Python process blocks until the target completes"},
+                    {"key": "D", "text": "Python executes a full garbage collection sweep"}
+                ],
+                "correct_option": "A",
+                "explanation": "`await` cooperative suspension transfers control back to the asyncio event loop, allowing other concurrent coroutines or I/O callbacks to make progress."
+            },
+            {
+                "question_text": "What distinction characterizes `@classmethod` compared to `@staticmethod` in Python class definitions?",
+                "topic": "Object-Oriented Python",
+                "options": [
+                    {"key": "A", "text": "`@classmethod` receives the class (`cls`) as its first argument; `@staticmethod` receives no implicit class or instance argument"},
+                    {"key": "B", "text": "`@staticmethod` can only access private attributes beginning with double underscore"},
+                    {"key": "C", "text": "`@classmethod` can only be invoked on subclasses, never the base class"},
+                    {"key": "D", "text": "`@staticmethod` runs synchronously while `@classmethod` is always async"}
+                ],
+                "correct_option": "A",
+                "explanation": "Methods decorated with `@classmethod` take the class object `cls` as the first argument, enabling alternative constructors and inheritance awareness. `@staticmethod` behaves like a plain function placed inside the class namespace."
             }
         ],
         "Hard": [
@@ -429,6 +575,30 @@ FALLBACK_MCQ_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 ],
                 "correct_option": "A",
                 "explanation": "CPython uses a generational cyclic garbage collector that tracks container objects across three generations, detecting unreachable isolated clusters whose reference count is greater than zero."
+            },
+            {
+                "question_text": "When defining a custom metaclass in Python (`class Meta(type):`), what is the primary role of the `__new__` method?",
+                "topic": "Metaprogramming & Advanced Python",
+                "options": [
+                    {"key": "A", "text": "It constructs and allocates the actual class object itself before the class body is initialized"},
+                    {"key": "B", "text": "It instantiates individual instances of the class at runtime"},
+                    {"key": "C", "text": "It registers the class with the operating system dynamic linker"},
+                    {"key": "D", "text": "It encrypts the class methods into binary bytecode"}
+                ],
+                "correct_option": "A",
+                "explanation": "In a metaclass, `__new__(mcs, name, bases, namespace)` is invoked to allocate and return the newly formed class type object before `__init__` configures it."
+            },
+            {
+                "question_text": "What methods must an object implement to act as a custom Descriptor in Python, controlling attribute access on owner classes?",
+                "topic": "Object-Oriented Python",
+                "options": [
+                    {"key": "A", "text": "At least one of `__get__()`, `__set__()`, or `__delete__()`"},
+                    {"key": "B", "text": "`__read__()` and `__write__()`"},
+                    {"key": "C", "text": "`__getattr__()` and `__setattr__()` only"},
+                    {"key": "D", "text": "`__lock__()` and `__unlock__()`"}
+                ],
+                "correct_option": "A",
+                "explanation": "The descriptor protocol consists of `__get__(self, instance, owner)`, `__set__(self, instance, value)`, and `__delete__(self, instance)`. Implementing any of these defines a descriptor."
             }
         ]
     },
@@ -1054,6 +1224,11 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 "question_text": "Explain the difference between mutable and immutable data types in Python. Give two examples of each, and explain what happens when you attempt to modify an immutable object.",
                 "topic": "Python Data Types & Collections",
                 "model_answer": "In Python, mutable objects can have their state or contents changed in-place without altering their memory identity (id()), whereas immutable objects cannot be modified once instantiated.\n\n- **Mutable examples**: list, dict, set.\n- **Immutable examples**: int, float, str, tuple, frozenset.\n\nWhen attempting to modify an immutable object (e.g., modifying a tuple index or concatenating a string), Python either raises a TypeError (for reassignment) or constructs an entirely new object in memory and updates the reference."
+            },
+            {
+                "question_text": "How does Python handle argument passing to functions? Explain the concept of 'pass-by-object-reference' and how it impacts mutable versus immutable arguments.",
+                "topic": "Functions & Variable Scope",
+                "model_answer": "Python uses pass-by-object-reference (or call-by-sharing). When you pass a variable to a function, the function receives a copy of the reference pointing to the existing object.\n\n- **Immutable objects** (int, str, tuple): Rebinding the parameter inside the function assigns the local name to a new object without mutating the caller's variable.\n- **Mutable objects** (list, dict): In-place modifications (e.g. `lst.append()`) alter the shared object in memory, visibly affecting the caller's reference."
             }
         ],
         "Easy to Medium": [
@@ -1061,6 +1236,11 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 "question_text": "What is a Python decorator, and how does it work behind the scenes? Provide a concise code example demonstrating a timer or logging decorator.",
                 "topic": "Decorators & Generators",
                 "model_answer": "A decorator in Python is a callable that accepts another function as an argument, extends or alters its behavior without modifying its source code, and returns a callable.\n\nBehind the scenes, the `@decorator` syntax is syntactic sugar for `target_func = decorator(target_func)`.\n\nExample:\n```python\nimport functools\n\ndef log_call(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        print(f'Calling {func.__name__}')\n        return func(*args, **kwargs)\n    return wrapper\n```"
+            },
+            {
+                "question_text": "Explain the lifecycle and execution sequence of a Python `try...except...else...finally` statement. When would you use the `else` block?",
+                "topic": "Error Handling & Debugging",
+                "model_answer": "1. **try**: The code under observation runs.\n2. **except**: Executes if an exception matching the exception type is raised in the `try` block.\n3. **else**: Executes if and only if the `try` block finishes successfully without raising any exceptions. It prevents accidental catching of exceptions raised by subsequent processing code.\n4. **finally**: Always executes regardless of whether an exception occurred, was handled, or a return statement was encountered, making it ideal for resource cleanup (e.g., closing file descriptors or database connections)."
             }
         ],
         "Medium": [
@@ -1068,6 +1248,11 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 "question_text": "Explain how generator functions and the `yield` statement enable memory-efficient data processing in Python. Contrast this with loading large datasets into lists.",
                 "topic": "Decorators & Generators",
                 "model_answer": "A standard function computes all results eagerly and returns them as a populated list, requiring O(N) memory proportional to dataset size. When processing multi-gigabyte logs or database streams, this causes memory exhaustion.\n\nGenerator functions use `yield` to return an iterator. When called, execution pauses at `yield`, retaining local scope state. Values are produced lazily on demand (O(1) memory), allowing streams of arbitrary size to be piped through generators efficiently."
+            },
+            {
+                "question_text": "What is the difference between shallow copy (`copy.copy`) and deep copy (`copy.deepcopy`) in Python? Explain with a scenario involving nested collections.",
+                "topic": "Memory Management & Reference Counting",
+                "model_answer": "- **Shallow Copy (`copy.copy`)**: Constructs a new collection object, but populates it with references to the child objects contained in the original. If a nested list or dictionary inside the shallow copy is mutated, the change is reflected in the original collection.\n- **Deep Copy (`copy.deepcopy`)**: Recursively constructs new copies of both the parent container and all nested child objects. Mutating elements within the copy leaves the original completely unmodified."
             }
         ],
         "Medium to Hard": [
@@ -1075,6 +1260,11 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 "question_text": "Discuss Python's Global Interpreter Lock (GIL). What problem does it solve, how does it impact multi-threaded CPU-bound versus I/O-bound programs, and how do you achieve parallelism for CPU-heavy tasks?",
                 "topic": "GIL & Multithreading vs Multiprocessing",
                 "model_answer": "The CPython GIL is a mutual-exclusion lock that prevents multiple native threads from executing Python bytecodes simultaneously. It was designed to safeguard CPython's reference-counting memory management from race conditions.\n\n- **I/O-Bound Tasks**: Multithreading works well because threads voluntarily release the GIL while waiting on network or disk I/O.\n- **CPU-Bound Tasks**: Multithreading degrades performance due to lock contention overhead across cores.\n- **Parallelism Solution**: Use `multiprocessing` or `concurrent.futures.ProcessPoolExecutor` to spawn separate OS processes with isolated memory spaces and distinct GILs."
+            },
+            {
+                "question_text": "Explain how asynchronous I/O with Python's `asyncio` works under the hood. Contrast coroutines running on an event loop with traditional multi-threaded concurrency.",
+                "topic": "Asynchronous Programming (asyncio)",
+                "model_answer": "`asyncio` provides single-threaded, cooperative multitasking based on an event loop. Coroutines (`async def`) pause execution when encountering an `await` on an I/O operation (socket read, timer), yielding execution back to the event loop. The loop polls OS primitives (epoll/kqueue) and resumes the coroutine when the I/O event is ready.\n\nUnlike multi-threading, which involves preemptive OS context switches, lock synchronization, and thread stack overhead (typically ~8MB per thread), asyncio tasks are lightweight Python objects with minimal memory footprint and zero race conditions during synchronous execution blocks."
             }
         ],
         "Hard": [
@@ -1082,6 +1272,11 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
                 "question_text": "Explain Python's two-tiered memory management system involving reference counting and the cyclic generational garbage collector. Describe how circular references are detected and how developers should profile memory leaks in production.",
                 "topic": "Memory Management & Reference Counting",
                 "model_answer": "CPython uses a two-tiered memory architecture:\n1. **Reference Counting**: Every PyObject has an `ob_refcnt` counter. When references are assigned, it increments; when deleted or out of scope, it decrements. When it hits 0, memory is immediately reclaimed.\n2. **Generational Cyclic GC**: Reference counting cannot reclaim circular graphs (A references B, B references A). Python has a cyclic garbage collector organized into Generations 0, 1, and 2. It periodically detects isolated graphs using a pointer traversal algorithm.\n\nIn production, developers profile memory leaks using `tracemalloc`, `gc.collect()`, `objgraph`, and `weakref` proxies to prevent circular leaks."
+            },
+            {
+                "question_text": "Explain the Python Descriptor protocol (`__get__`, `__set__`, `__delete__`). Describe how descriptors power Python features such as `@property`, methods, and `@classmethod`, and when you would implement a custom descriptor.",
+                "topic": "Object-Oriented Python",
+                "model_answer": "A descriptor is any object that defines at least one of `__get__()`, `__set__()`, or `__delete__()`. In Python, attribute access on an instance (`instance.attr`) triggers `Class.__dict__['attr'].__get__(instance, Class)` if `attr` is a descriptor.\n\n- **Properties**: `@property` implements a descriptor returning calculated values.\n- **Methods**: Functions define `__get__`, which binds the function to `instance` when accessed as an attribute, creating a bound method.\n- **Use Cases**: Custom descriptors are used for declarative ORM field validation (like SQLAlchemy or Django model fields), lazy caching attributes, and framework typing enforcement."
             }
         ]
     },
@@ -1382,6 +1577,25 @@ FALLBACK_TEXT_BANK: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
         ]
     }
 }
+
+# Merge high-capacity multi-role expanded question banks
+try:
+    from app.services.expanded_question_banks import EXTRA_MCQ_BANK, EXTRA_TEXT_BANK
+    for r_name, d_map in EXTRA_MCQ_BANK.items():
+        if r_name in FALLBACK_MCQ_BANK:
+            for d_level, q_items in d_map.items():
+                FALLBACK_MCQ_BANK[r_name].setdefault(d_level, []).extend(q_items)
+        else:
+            FALLBACK_MCQ_BANK[r_name] = d_map
+
+    for r_name, d_map in EXTRA_TEXT_BANK.items():
+        if r_name in FALLBACK_TEXT_BANK:
+            for d_level, q_items in d_map.items():
+                FALLBACK_TEXT_BANK[r_name].setdefault(d_level, []).extend(q_items)
+        else:
+            FALLBACK_TEXT_BANK[r_name] = d_map
+except Exception as _e:
+    pass
 
 def get_fallback_bank_for_role(role: str, mode: str) -> Dict[str, List[Dict[str, Any]]]:
     """

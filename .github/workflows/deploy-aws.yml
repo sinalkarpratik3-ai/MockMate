@@ -1,0 +1,141 @@
+name: Deploy MockMate to AWS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: Run Automated Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Backend Tests
+        run: |
+          pytest backend/tests -v
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Frontend Tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build Next.js Production Bundle
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: "/api"
+        run: npm run build
+
+  deploy:
+    name: Deploy to AWS Fargate
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: http://${{ steps.stack-outputs.outputs.alb_dns }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      STACK_NAME: ${{ vars.STACK_NAME || 'mockmate-prod' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy CloudFormation Base Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/template.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              EnvironmentName=${{ env.STACK_NAME }} \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+              JwtSecretKey="${{ secrets.JWT_SECRET_KEY }}" \
+              GeminiApiKey="${{ secrets.GEMINI_API_KEY }}" \
+            --no-fail-on-empty-changeset
+
+      - name: Retrieve Stack Outputs
+        id: stack-outputs
+        run: |
+          BACKEND_ECR=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='BackendECRRepositoryURI'].OutputValue" --output text)
+          FRONTEND_ECR=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='FrontendECRRepositoryURI'].OutputValue" --output text)
+          ALB_DNS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" --output text)
+          echo "backend_ecr=$BACKEND_ECR" >> $GITHUB_OUTPUT
+          echo "frontend_ecr=$FRONTEND_ECR" >> $GITHUB_OUTPUT
+          echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Build and Push Backend Image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t ${{ steps.stack-outputs.outputs.backend_ecr }}:$IMAGE_TAG ./backend
+          docker tag ${{ steps.stack-outputs.outputs.backend_ecr }}:$IMAGE_TAG ${{ steps.stack-outputs.outputs.backend_ecr }}:latest
+          docker push ${{ steps.stack-outputs.outputs.backend_ecr }}:$IMAGE_TAG
+          docker push ${{ steps.stack-outputs.outputs.backend_ecr }}:latest
+
+      - name: Build and Push Frontend Image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build --build-arg NEXT_PUBLIC_API_URL="/api" -t ${{ steps.stack-outputs.outputs.frontend_ecr }}:$IMAGE_TAG ./frontend
+          docker tag ${{ steps.stack-outputs.outputs.frontend_ecr }}:$IMAGE_TAG ${{ steps.stack-outputs.outputs.frontend_ecr }}:latest
+          docker push ${{ steps.stack-outputs.outputs.frontend_ecr }}:$IMAGE_TAG
+          docker push ${{ steps.stack-outputs.outputs.frontend_ecr }}:latest
+
+      - name: Update ECS Services
+        run: |
+          aws ecs update-service --cluster ${{ env.STACK_NAME }}-cluster --service ${{ env.STACK_NAME }}-backend-service --force-new-deployment
+          aws ecs update-service --cluster ${{ env.STACK_NAME }}-cluster --service ${{ env.STACK_NAME }}-frontend-service --force-new-deployment
+
+      - name: Verify Health Check
+        run: |
+          echo "Verifying deployment at http://${{ steps.stack-outputs.outputs.alb_dns }}/api/health"
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ steps.stack-outputs.outputs.alb_dns }}/api/health || true)
+            if [ "$STATUS" == "200" ]; then
+              echo "Backend is healthy!"
+              exit 0
+            fi
+            echo "Waiting for service to become healthy (attempt $i/30)..."
+            sleep 10
+          done
+          echo "Timed out waiting for health check."
+          exit 1

@@ -80,3 +80,24 @@ def test_user_timestamps_and_update(client):
             assert count >= 0
     asyncio.run(run_check())
 
+def test_password_hashing_security():
+    """Verify that user passwords are saved as bcrypt hashes and never plaintext."""
+    from app.core.security import get_password_hash, verify_password
+    plain = "SuperSecret123!"
+    hashed = get_password_hash(plain)
+    assert hashed != plain
+    assert hashed.startswith("$2b$") or hashed.startswith("$2a$")
+    assert verify_password(plain, hashed) is True
+    assert verify_password("WrongPassword!", hashed) is False
+
+def test_logout_endpoint(client, auth_headers):
+    """Verify POST /api/auth/logout."""
+    res = client.post("/api/auth/logout", headers=auth_headers)
+    assert res.status_code == 200
+    assert "Successfully logged out" in res.json()["message"]
+
+def test_invalid_token_rejected(client):
+    """Verify invalid or forged JWT token is rejected with 401."""
+    res = client.get("/api/auth/me", headers={"Authorization": "Bearer invalid.jwt.token"})
+    assert res.status_code == 401
+

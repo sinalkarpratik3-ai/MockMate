@@ -1,5 +1,5 @@
 # ==============================================================================
-# MockMate - Root Multi-Stage Dockerfile for Render & Container Deployments
+# MockMate - Root Multi-Stage Dockerfile for Container Deployments
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
